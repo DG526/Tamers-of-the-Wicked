@@ -1,10 +1,12 @@
 #include <SDL.h>
 #include "gf2d_graphics.h"
 #include "gf2d_sprite.h"
+#include "gf2d_font.h"
 #include "gfc_input.h"
 #include "simple_logger.h"
 #include "totw_entity.h"
 #include "totw_fiend.h"
+#include "totw_gui.h"
 
 int main(int argc, char * argv[])
 {
@@ -16,6 +18,7 @@ int main(int argc, char * argv[])
     int mx,my;
     float mf = 0;
     Sprite *mouse;
+    Sprite *panel;
     Color mouseColor = gfc_color8(255,100,255,200);
     Vector2D renderSize = vector2d(300, 180);
     Vector2D renderScale = vector2d(4, 4);
@@ -33,14 +36,17 @@ int main(int argc, char * argv[])
         0);
     gf2d_graphics_set_frame_delay(16);
     gf2d_sprite_init(1024);
-    SDL_ShowCursor(SDL_DISABLE);
+    gf2d_font_init("config/font.cfg");
+    SDL_ShowCursor(SDL_ENABLE);
 
     entity_manager_init(256);
+    gui_manager_init(128);
     gfc_input_init("config/input_dualshock.cfg");
     
     /*demo setup*/
     //sprite = gf2d_sprite_load_image("images/backgrounds/bg_flat.png");
     mouse = gf2d_sprite_load_all("images/pointer.png",32,32,16,0);
+    panel = gf2d_sprite_load_all("images/window_frame.png", 8, 8, 3, 0);
 
     Sprite* monsterSprite1 = gf2d_sprite_load_all("images/enemies/Boarcupine_Battle.png", 64, 64, 1, 0);
     Sprite* monsterSprite2 = gf2d_sprite_load_all("images/enemies/Laugher_Battle.png", 64, 64, 1, 0);
@@ -65,6 +71,12 @@ int main(int argc, char * argv[])
         slog("Mothsquito created @ (%f, %f).", mothsquito->position.x, mothsquito->position.y);
         mothsquito->update = dummy_think;
     }
+
+    GUI* bDialogueFrame = gui_window_create(vector2d(4, renderSize.y / 2 + 4), vector2d(renderSize.x - 8, renderSize.y / 2 - 8), 0, panel);
+    GUI* bDialogue = gui_text_create(vector2d(12, renderSize.y / 2 + 12), "Fiends approach!\nCourse of action?", 1, 1);
+    if (bDialogueFrame) {
+        slog("Frame created.");
+    }
     /*main game loop*/
     while(!done)
     {
@@ -78,6 +90,7 @@ int main(int argc, char * argv[])
 
         entity_think_all();
         entity_update_all();
+        gui_update_all();
 
         gf2d_graphics_clear_screen();// clears drawing buffers
         // all drawing should happen betweem clear_screen and next_frame
@@ -86,6 +99,8 @@ int main(int argc, char * argv[])
             
             //UI elements last
             entity_draw_all();
+            gui_draw_all();
+            //gf2d_font_draw_line_tag("Fiends approach!\nCourse of action?", FT_Normal, gfc_color(0, 0, 0, 1), vector2d(12, renderSize.y / 2 + 12));
         Vector2D frac = vector2d(1 / renderScale.x, 1 / renderScale.y);
             /*gf2d_sprite_draw(
                 mouse,

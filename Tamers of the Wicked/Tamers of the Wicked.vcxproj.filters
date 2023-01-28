@@ -96,6 +96,12 @@
     <ClInclude Include="..\include\totw_fiend.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\totw_gui.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gf2d_font.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\game.c">
@@ -174,6 +180,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\totw_fiend.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\totw_gui.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\gf2d_font.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
