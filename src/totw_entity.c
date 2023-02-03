@@ -1,5 +1,6 @@
 #include "simple_logger.h"
 #include "totw_entity.h"
+#include "totw_fiend.h"
 
 
 typedef struct {
@@ -48,7 +49,20 @@ void entity_free(Entity* ent) {
 		slog("No entity provided for freeing.");
 		return;
 	}
+	if (ent->type == ET_Fiend) {
+		FiendData* data = ent->data;
+		gf2d_sprite_free(data->sprite);
+		memset(data, 0, sizeof(FiendData));
+	}
 	if (ent->sprite)
+		gf2d_sprite_free(ent->sprite);
+	memset(ent, 0, sizeof(Entity));
+}
+void entity_free_leave_data(Entity* ent) {
+	if (!ent) {
+		slog("No entity provided for freeing.");
+		return;
+	}if (ent->sprite)
 		gf2d_sprite_free(ent->sprite);
 	memset(ent, 0, sizeof(Entity));
 }

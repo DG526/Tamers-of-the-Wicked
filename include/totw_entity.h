@@ -6,9 +6,14 @@
 
 #include "gf2d_sprite.h"
 
+typedef enum {
+	ET_Fiend
+}EntityType;
+
 typedef struct Entity_S
 {
 	Bool inuse;
+	EntityType type;
 	Sprite* sprite;
 	float frame;
 	Vector2D position;
@@ -16,6 +21,8 @@ typedef struct Entity_S
 
 	void (*update)(struct Entity_S* self);
 	void (*think)(struct Entity_S* self);
+
+	void* data;
 }Entity;
 
 /**
@@ -31,6 +38,7 @@ void entity_manager_init(Uint32 max);
 Entity* entity_new();
 
 void entity_free(Entity* ent);
+void entity_free_leave_data(Entity* ent);
 void entity_free_all();
 
 void entity_draw(Entity* ent);
