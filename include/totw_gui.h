@@ -14,7 +14,8 @@ typedef enum {
 	Option,
 	Letter,
 	Meter,
-	ButtonHint
+	ButtonHint,
+	Container
 }GUIType;
 
 typedef struct GUI_S {
@@ -23,6 +24,7 @@ typedef struct GUI_S {
 	Sprite* sprite;
 	Vector2D position;
 	GUIType type;
+	Color color;
 	int layer;
 	void* data;
 	void (*update)(struct GUI_S* self);
@@ -40,6 +42,7 @@ typedef struct {
 typedef struct {
 	TextLine text;
 	GUI* left, * right, * up, * down;
+	Bool isPointingUp, isPointingDown;
 	Bool grayed;
 	Bool selectedNow;
 	Bool selected;
@@ -51,9 +54,9 @@ typedef struct {
 typedef struct {
 	TextBlock text;
 	GUI* left, * right, * up, * down;
-	char letter;
-	Bool selected;
-	TextWord* appendTo;
+	char letter, shiftLetter;
+	Bool shifted, selected, selectedNow;
+	TextLine* appendTo;
 }LetterData;
 typedef struct {
 	Vector2D proportions;
@@ -72,7 +75,7 @@ void gui_manager_init(Uint32 max);
 GUI* gui_window_create(Vector2D position, Vector2D size, int layer);
 GUI* gui_text_create(Vector2D position, TextBlock text, Bool scrolling, int layer);
 GUI* gui_option_create(Vector2D position, TextLine text, Bool isDefault, int layer);
-GUI* gui_letter_create(Vector2D position, char letter, Bool isDefault, TextWord* appendTo, int layer);
+GUI* gui_letter_create(Vector2D position, char letter, char shiftLetter, Bool isDefault, TextLine* appendTo, int layer);
 GUI* gui_meter_create(Vector2D position, Vector2D size, Color color, int layer);
 /**
 *@param position: where to put the hint
@@ -91,5 +94,12 @@ void gui_update_all();
 void gui_free(GUI* self);
 void gui_free_all();
 
+typedef struct {
+	List* elements;
+	GUI* returnToOnClose;
+	int layer;
+}SubmenuData;
+
+GUI* gui_error_create(TextLine message, int layer, GUI* returnTo);
 
 #endif

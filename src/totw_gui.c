@@ -1,6 +1,7 @@
 #include "simple_logger.h"
 #include "gf2d_font.h"
 #include "totw_gui.h"
+#include "totw_game_status.h"
 
 typedef struct {
 	Uint32 entityMax;
@@ -46,6 +47,7 @@ GUI* gui_window_create(Vector2D position, Vector2D size, int layer) {
 		guiManager.entityList[i].data = data;
 		guiManager.entityList[i].layer = layer;
 		guiManager.entityList[i].sprite = panel;
+		guiManager.entityList[i].color = gfc_color(1, 1, 1, 1);
 		return &guiManager.entityList[i];
 	}
 	memset(data, 0, sizeof(WindowData));
@@ -63,6 +65,7 @@ GUI* gui_text_create(Vector2D position, TextBlock text, Bool scrolling, int laye
 		vector2d_copy(guiManager.entityList[i].position, position);
 		guiManager.entityList[i].data = data;
 		guiManager.entityList[i].layer = layer;
+		guiManager.entityList[i].color = gfc_color(0, 0, 0, 1);
 		return &guiManager.entityList[i];
 	}
 	memset(data, 0, sizeof(TextData));
@@ -82,18 +85,20 @@ GUI* gui_option_create(Vector2D position, TextLine text, Bool isDefault, int lay
 		guiManager.entityList[i].data = data;
 		guiManager.entityList[i].layer = layer;
 		guiManager.entityList[i].sprite = cursor;
+		guiManager.entityList[i].color = gfc_color(0, 0, 0, 1);
 		return &guiManager.entityList[i];
 	}
 	memset(data, 0, sizeof(OptionData));
 	return NULL;
 }
-GUI* gui_letter_create(Vector2D position, char letter, Bool isDefault, TextWord* appendTo, int layer) {
+GUI* gui_letter_create(Vector2D position, char letter, char shiftLetter, Bool isDefault, TextLine* appendTo, int layer) {
 	LetterData* data = gfc_allocate_array(sizeof(LetterData), 1);
 	if (!data) return NULL;
 	Sprite* cursor = gf2d_sprite_load_all("images/selection_cursor.png", 8, 7, 2, 0);
 	data->letter = letter;
+	data->shiftLetter = shiftLetter;
 	data->appendTo = appendTo;
-	data->selected = isDefault;
+	data->selectedNow = isDefault;
 	for (int i = 0; i < guiManager.entityMax; i++) {
 		if (guiManager.entityList[i].inuse) continue;
 		guiManager.entityList[i].inuse = 1;
@@ -102,6 +107,7 @@ GUI* gui_letter_create(Vector2D position, char letter, Bool isDefault, TextWord*
 		guiManager.entityList[i].data = data;
 		guiManager.entityList[i].layer = layer;
 		guiManager.entityList[i].sprite = cursor;
+		guiManager.entityList[i].color = gfc_color(0, 0, 0, 1);
 		return &guiManager.entityList[i];
 	}
 	memset(data, 0, sizeof(LetterData));
@@ -144,6 +150,7 @@ GUI* gui_hint_create(Vector2D position, TextLine text, int icon, int layer) {
 		guiManager.entityList[i].data = data;
 		guiManager.entityList[i].layer = layer;
 		guiManager.entityList[i].sprite = icons;
+		guiManager.entityList[i].color = gfc_color(0, 0, 0, 1);
 		return &guiManager.entityList[i];
 	}
 	memset(data, 0, sizeof(ButtonHintData));
@@ -173,6 +180,15 @@ void gui_free(GUI* self) {
 	case Meter:
 		memset(self->data, 0, sizeof(MeterData));
 		break;
+	case Container:{
+		int c = gfc_list_get_count(((SubmenuData*)(self->data))->elements);
+		for (int i = 0; i < c; i++) {
+			gui_free((GUI*)(gfc_list_get_nth(((SubmenuData*)(self->data))->elements, i)));
+		}
+		gfc_list_delete(((SubmenuData*)(self->data))->elements);
+		memset(self->data, 0, sizeof(SubmenuData));
+		break;
+		}
 	}
 	memset(self, 0, sizeof(GUI));
 }
@@ -204,7 +220,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				0
 			);
 			//Top
@@ -215,7 +231,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				1
 			);
 			//TR Corner
@@ -226,7 +242,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				2
 			);
 			//Left
@@ -237,7 +253,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				3
 			);
 			//Center
@@ -248,7 +264,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				4
 			);
 			//Right
@@ -259,7 +275,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				5
 			);
 			//BL Corner
@@ -270,7 +286,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				6
 			);
 			//Bottom
@@ -281,7 +297,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				7
 			);
 			//BR Corner
@@ -292,22 +308,22 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
-				NULL,
+				&self->color,
 				8
 			);
 		}
 		break;
 	case Text:
 		if(!((TextData*)(self->data))->scrolling)
-			gf2d_font_draw_line_tag(((TextData*)(self->data))->text, FT_Normal, gfc_color(0, 0, 0, 1), self->position);
+			gf2d_font_draw_line_tag(((TextData*)(self->data))->text, FT_Normal, self->color, self->position);
 		else {
 			TextBlock disp;
 			gfc_block_cpy(disp, ((TextData*)(self->data))->text);
 			disp[(int)(((TextData*)(self->data))->currentChar) + 1] = '\0';
-			gf2d_font_draw_line_tag(disp, FT_Normal, gfc_color(0, 0, 0, 1), self->position);
+			gf2d_font_draw_line_tag(disp, FT_Normal, self->color, self->position);
 		}
 		break;
-	case Option:
+	case Letter:
 		if (self->sprite) {
 			gf2d_sprite_draw(
 				self->sprite,
@@ -317,9 +333,29 @@ void gui_draw(GUI* self) {
 				NULL,
 				NULL,
 				NULL,
+				(((LetterData*)(self->data))->selected) ? 1 : 0
+			);
+			TextWord display;
+			sprintf(display, "%c", (((LetterData*)(self->data))->shifted ? ((LetterData*)(self->data))->shiftLetter : ((LetterData*)(self->data))->letter));
+			gf2d_font_draw_line_tag(display, FT_Normal, self->color, vector2d(self->position.x + 10, self->position.y));
+		}
+		break;
+	case Option:
+		if (self->sprite) {
+			float deg = 0;
+			if (((OptionData*)(self->data))->isPointingUp) deg -= 90;
+			if (((OptionData*)(self->data))->isPointingDown) deg += 90;
+			gf2d_sprite_draw(
+				self->sprite,
+				vector2d(self->position.x, self->position.y + 1),
+				NULL,
+				NULL,
+				&deg,
+				NULL,
+				NULL,
 				(((OptionData*)(self->data))->selected) ? 1 : 0
 			);
-			gf2d_font_draw_line_tag(((OptionData*)(self->data))->text, FT_Normal, ((OptionData*)(self->data))->grayed ? gfc_color(0.5, 0.5, 0.5, 1) : gfc_color(0, 0, 0, 1), vector2d(self->position.x + 10, self->position.y));;
+			gf2d_font_draw_line_tag(((OptionData*)(self->data))->text, FT_Normal, ((OptionData*)(self->data))->grayed ? gfc_color(0.5, 0.5, 0.5, 1) : self->color, vector2d(self->position.x + 10, self->position.y));;
 		}
 		break;
 	case Meter:
@@ -459,7 +495,7 @@ void gui_draw(GUI* self) {
 				NULL,
 				((ButtonHintData*)(self->data))->icon
 			);
-			gf2d_font_draw_line_tag(((OptionData*)(self->data))->text, FT_Normal, ((OptionData*)(self->data))->grayed ? gfc_color(0.5, 0.5, 0.5, 1) : gfc_color(0, 0, 0, 1), vector2d(self->position.x + 10, self->position.y));;
+			gf2d_font_draw_line_tag(((OptionData*)(self->data))->text, FT_Normal, ((OptionData*)(self->data))->grayed ? gfc_color(0.5, 0.5, 0.5, 1) : self->color, vector2d(self->position.x + 10, self->position.y));;
 		}
 		break;
 	}
@@ -489,23 +525,48 @@ void gui_update(GUI* self) {
 				slog("Selected an option.");
 				if(((OptionData*)(self->data))->onChoose)
 					((OptionData*)(self->data))->onChoose(((OptionData*)(self->data))->choiceArgument);
+				if (!self->inuse) return;
 			}
 			else {
 				if (((OptionData*)(self->data))->down && gfc_input_controller_button_pressed(0, "D_D")) {
-					((OptionData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
-					((OptionData*)(self->data))->selected = false;
+					if (((OptionData*)(self->data))->down->type == Option) {
+						((OptionData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
+					else if (((OptionData*)(self->data))->down->type == Letter) {
+						((LetterData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
 				}
-				if (((OptionData*)(self->data))->up && gfc_input_controller_button_pressed(0, "D_U")) {
-					((OptionData*)(((OptionData*)(self->data))->up->data))->selectedNow = true;
-					((OptionData*)(self->data))->selected = false;
+				else if (((OptionData*)(self->data))->up && gfc_input_controller_button_pressed(0, "D_U")) {
+					if (((OptionData*)(self->data))->up->type == Option) {
+						((OptionData*)(((OptionData*)(self->data))->up->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
+					else if (((OptionData*)(self->data))->up->type == Letter) {
+						((LetterData*)(((OptionData*)(self->data))->up->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
 				}
-				if (((OptionData*)(self->data))->left && gfc_input_controller_button_pressed(0, "D_L")) {
-					((OptionData*)(((OptionData*)(self->data))->left->data))->selectedNow = true;
-					((OptionData*)(self->data))->selected = false;
+				else if (((OptionData*)(self->data))->left && gfc_input_controller_button_pressed(0, "D_L")) {
+					if (((OptionData*)(self->data))->left->type == Option) {
+						((OptionData*)(((OptionData*)(self->data))->left->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
+					else if (((OptionData*)(self->data))->left->type == Letter) {
+						((LetterData*)(((OptionData*)(self->data))->left->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
 				}
-				if (((OptionData*)(self->data))->right && gfc_input_controller_button_pressed(0, "D_R")) {
-					((OptionData*)(((OptionData*)(self->data))->right->data))->selectedNow = true;
-					((OptionData*)(self->data))->selected = false;
+				else if (((OptionData*)(self->data))->right && gfc_input_controller_button_pressed(0, "D_R")) {
+					if (((OptionData*)(self->data))->right->type == Option) {
+						((OptionData*)(((OptionData*)(self->data))->right->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
+					else if (((OptionData*)(self->data))->right->type == Letter) {
+						((LetterData*)(((OptionData*)(self->data))->right->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
 				}
 			}
 		}
@@ -515,6 +576,74 @@ void gui_update(GUI* self) {
 			((OptionData*)(self->data))->selected = true;
 		}
 	}
+	if (self->type == Letter) {
+		if (((LetterData*)(self->data))->selected && self->visible) {
+			if (gfc_input_controller_button_pressed_by_index(0, 0)) {
+				slog("Selected a letter.");
+				for (int i = 0; i < 10; i++) {
+					if ((*(((LetterData*)(self->data))->appendTo))[i] == '\0') {
+						char newChar = (((LetterData*)(self->data))->shifted ? ((LetterData*)(self->data))->shiftLetter : ((LetterData*)(self->data))->letter);
+						TextLine newName;
+						sprintf(newName, "%s%c", *(((LetterData*)(self->data))->appendTo), newChar);
+						gfc_line_cpy((((LetterData*)(self->data))->appendTo), newName);
+						//memcpy(&(*(((LetterData*)(self->data))->appendTo)[i]), &newChar, sizeof(char));
+						//*(((LetterData*)(self->data))->appendTo)[i] = newChar;
+						//char end = '\0';
+						//memcpy(&(*(((LetterData*)(self->data))->appendTo)[i+1]), &end, sizeof(char));
+						//*(((LetterData*)(self->data))->appendTo)[i + 1] = '\0';
+						slog("Appended character at position %i. Name is now %s.", i, *(((LetterData*)(self->data))->appendTo));
+						break;
+					}
+				}
+			}
+			else {
+				if (((LetterData*)(self->data))->down && gfc_input_controller_button_pressed(0, "D_D")) {
+					if (((LetterData*)(self->data))->down->type == Option) {
+						((OptionData*)(((LetterData*)(self->data))->down->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+					else if (((LetterData*)(self->data))->down->type == Letter) {
+						((LetterData*)(((LetterData*)(self->data))->down->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+				}
+				else if (((LetterData*)(self->data))->up && gfc_input_controller_button_pressed(0, "D_U")) {
+					if (((LetterData*)(self->data))->up->type == Option) {
+						((OptionData*)(((LetterData*)(self->data))->up->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+					else if (((LetterData*)(self->data))->up->type == Letter) {
+						((LetterData*)(((LetterData*)(self->data))->up->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+				}
+				else if (((LetterData*)(self->data))->left && gfc_input_controller_button_pressed(0, "D_L")) {
+					if (((LetterData*)(self->data))->left->type == Option) {
+						((OptionData*)(((LetterData*)(self->data))->left->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+					else if (((LetterData*)(self->data))->left->type == Letter) {
+						((LetterData*)(((LetterData*)(self->data))->left->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+				}
+				else if (((LetterData*)(self->data))->right && gfc_input_controller_button_pressed(0, "D_R")) {
+					if (((LetterData*)(self->data))->right->type == Option) {
+						((OptionData*)(((LetterData*)(self->data))->right->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+					else if (((LetterData*)(self->data))->right->type == Letter) {
+						((LetterData*)(((LetterData*)(self->data))->right->data))->selectedNow = true;
+						((LetterData*)(self->data))->selected = false;
+					}
+				}
+			}
+		}
+		if (((LetterData*)(self->data))->selectedNow && self->visible) {
+			((LetterData*)(self->data))->selectedNow = false;
+			((LetterData*)(self->data))->selected = true;
+		}
+	}
 	if (self->update) self->update(self);
 }
 void gui_update_all() {
@@ -522,5 +651,39 @@ void gui_update_all() {
 	for (int i = 0; i < guiManager.entityMax; i++) {
 		if (!guiManager.entityList[i].inuse) continue;
 		gui_update(&(guiManager.entityList[i]));
+	}
+}
+
+void window_close_on_cross(GUI* self) {
+	if (gfc_input_controller_button_pressed_by_index(0, 0)) {
+		if (((SubmenuData*)(self->data))->returnToOnClose) {
+			if (((SubmenuData*)(self->data))->returnToOnClose->type == Option)
+				((OptionData*)(((SubmenuData*)(self->data))->returnToOnClose->data))->selectedNow = true;
+			else if (((SubmenuData*)(self->data))->returnToOnClose->type == Letter)
+				((LetterData*)(((SubmenuData*)(self->data))->returnToOnClose->data))->selectedNow = true;
+		}
+		gui_free(self);
+	}
+}
+GUI* gui_error_create(TextLine message, int layer, GUI* returnTo) {
+	gfc_input_update();
+	SubmenuData* data = gfc_allocate_array(sizeof(SubmenuData), 1);
+	GUI* window = gui_window_create(vector2d(game_get_resolution_x() / 2 - 50, game_get_resolution_y() / 2 - 25), vector2d(100, 50), layer);
+	window->color = gfc_color8(255, 107, 107, 255);
+	window->visible = true;
+	GUI* text = gui_text_create(vector2d(game_get_resolution_x() / 2 - 45, game_get_resolution_y() / 2 - 20), message, false, layer + 1);
+	text->visible = true;
+	data->elements = gfc_list_new();
+	gfc_list_append(data->elements, window);
+	gfc_list_append(data->elements, text);
+	data->returnToOnClose = returnTo;
+	for (int i = 0; i < guiManager.entityMax; i++) {
+		if (guiManager.entityList[i].inuse) continue;
+		guiManager.entityList[i].inuse = 1;
+		guiManager.entityList[i].type = Container;
+		guiManager.entityList[i].data = data;
+		guiManager.entityList[i].layer = 0;
+		guiManager.entityList[i].update = window_close_on_cross;
+		return &guiManager.entityList[i];
 	}
 }

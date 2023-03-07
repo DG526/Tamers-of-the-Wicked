@@ -50,7 +50,7 @@ void entity_free(Entity* ent) {
 		return;
 	}
 	if (ent->type == ET_Fiend) {
-		FiendData* data = ent->data;
+		FiendData* data = (FiendData*)(ent->data);
 		gf2d_sprite_free(data->sprite);
 		memset(data, 0, sizeof(FiendData));
 	}
@@ -77,6 +77,10 @@ void entity_free_all() {
 
 void entity_draw(Entity* ent) {
 	if (!ent) return;
+	if (ent->type == ET_Fiend) {
+		FiendData* data = (FiendData*)(ent->data);
+		if (data->HP == 0) return;
+	}
 	if (ent->sprite) {
 		gf2d_sprite_draw(
 			ent->sprite,

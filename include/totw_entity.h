@@ -7,7 +7,9 @@
 #include "gf2d_sprite.h"
 
 typedef enum {
-	ET_Fiend
+	ET_Player,
+	ET_Fiend,
+	ET_NamingSystem
 }EntityType;
 
 typedef struct Entity_S

@@ -10,6 +10,7 @@ typedef enum {
 	BP_RoundPrep,
 	BP_PreppingItem,
 	BP_PreppingAction,
+	BP_PreppingRecruit,
 	BP_PreAction,
 	BP_Acting,
 	BP_PostAction,
@@ -57,10 +58,16 @@ typedef struct {
 	GUI* opFlee;
 }BattleMenu_Ch_Initial;
 typedef struct {
+	GUI* dialogueFrame;
+	GUI* dialogueText;
+	GUI* options[4];
+}BattleMenu_Targeting;
+typedef struct {
 	AllyGUI allyGUI[4];
 	BattleMenu currentMenu;
 	BattleMenu_TextDisplay textDisplay;
 	BattleMenu_Ch_Initial choice_initial;
+	BattleMenu_Targeting target_ally, target_enemy;
 }BattleGUIHolder;
 
 typedef struct Battle_S {
@@ -70,16 +77,37 @@ typedef struct Battle_S {
 	int currentFiend;		//The fiend acting/accepting orders right now
 	int round;				//How many full rounds have elapsed since the battle started + 1
 	int accumulatedEXP;		//How much EXP the party will earn if they win. Increases every time a foe dies.
-	float timeInMove;		//How many seconds have elapsed since the current phase/action began
-	Skill* movePlans[8];	//List of planned moves
-	Skill* moveOrder[8];	//List of planned moves organized by turn order
+	int turn;
+	int turnPhase;
+	int timeForMove;		//The time at which action will continue.
+	Skill movePlans[8];		//List of planned moves
+	int moveOrderDeterminer[8];	//List of ints to sort from highest->lowest
+	Vector4D movePlanUT[8];	//List of user/target identifiers for plans, x = user party, y = user member, z = target party, w = target member
+	Skill moveOrder[8];		//List of planned moves organized by turn order
+	Vector4D moveOrderUT[8];	//List of user/target identifiers for actions in order, x = user party, y = user member, z = target party, w = target member
 	BattleGUIHolder gui;	//Accessor to the battle's various menus, etc.
+
+	Bool canRecruit;
+	Bool recruiting;
+	Bool recruited;
+	int recruitTarget;
+	float recruitChance;
+	int recruitAttempt;
 }Battle;
 void kill_battle();
 int in_battle();
+void battle_wait(int milliseconds);
 void generate_new_battle(TextWord dungeon, int poolID);
 void load_boss_battle(int battleID);
 
 void battle_update();
+
+FiendData* battle_get_party_member(int party, int member);
+void battle_set_main_dialogue(TextBlock text);
+
+int startRound_fight(void* target);
+int startRound_recruit(void* target);
+void battle_impress_enemy(float percent);
+float battle_get_recruit_chance();
 
 #endif

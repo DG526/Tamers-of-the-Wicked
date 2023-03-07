@@ -2,9 +2,57 @@
 #include "simple_logger.h"
 #include "simple_json.h"
 #include "totw_fiend.h"
+#include "totw_battle.h"
 
 static Party playerParty = { 0 };
 static Menagerie playerMenagerie = { 0 };
+
+int fiend_damage(FiendData* target, int raw) {
+	if (fiend_has_status(target, FS_Defending))
+		raw /= 2;
+	raw = max(raw, 0);
+	target->HP = max(target->HP - raw, 0);
+	return raw;
+}
+float fiend_impress(FiendData* target, float raw) {
+	if (fiend_has_status(target, FS_Defending))
+		raw /= 2;
+	battle_impress_enemy(raw);
+	return raw;
+}
+Bool fiend_has_status(FiendData* fiend, FiendStatusType status) {
+	for (int i = 0; i < 10; i++) {
+		if (fiend->statuses[i].enabled && fiend->statuses[i].status == status)
+			return true;
+	}
+	return false;
+}
+void fiend_remove_status(FiendData* fiend, FiendStatusType status) {
+	for (int i = 0; i < 10; i++) {
+		if (fiend->statuses[i].enabled && fiend->statuses[i].status == status) {
+			fiend->statuses[i].enabled = false;
+			fiend->statuses[i].status = FS_Null;
+			fiend->statuses[i].duration = 0;
+			return;
+		}
+	}
+}
+void fiend_apply_status(FiendData* fiend, FiendStatusType status, int duration) {
+	for (int i = 0; i < 10; i++) {
+		if (fiend->statuses[i].enabled && fiend->statuses[i].status == status) {
+			fiend->statuses[i].duration = duration;
+			return;
+		}
+	}
+	for (int i = 0; i < 10; i++) {
+		if (!fiend->statuses[i].enabled) {
+			fiend->statuses[i].enabled = true;
+			fiend->statuses[i].status = status;
+			fiend->statuses[i].duration = duration;
+			return;
+		}
+	}
+}
 
 void ally_list_load() {
 	SJson* save = sj_load("save/savegame.dat");
@@ -21,12 +69,12 @@ void ally_list_load() {
 	SJList* keys = sj_object_get_keys_list(menagerie);
 	playerMenagerie.fiendCount = keys->count;
 	for (int i = 0; i < playerMenagerie.fiendCount; i++) {
-		TextWord name = ""; 
-		gfc_word_cpy(name, (const char*)sj_list_get_nth(keys, i));
+		TextLine name = ""; 
+		gfc_line_cpy(name, (const char*)sj_list_get_nth(keys, i));
 		SJson* fiend = sj_object_get_value(menagerie, name);
 		FiendData* data = read_fiend(sj_get_string_value(sj_object_get_value(fiend, "species")));
 		sj_get_integer_value(sj_object_get_value(fiend, "level"), &(data->level));
-		gfc_word_cpy(data->name, name);
+		gfc_line_cpy(data->name, name);
 		playerMenagerie.fiends[i] = data;
 		calculate_stats(data);
 		data->HP = data->stats[MHP];
@@ -55,10 +103,11 @@ void party_load() {
 	}
 	int members = sj_array_get_count(party);
 	for (int i = 0; i < members; i++) {
-		gfc_word_cpy(playerParty.fiendNames[members - 1 - i], sj_get_string_value(sj_array_get_nth(party, i)));
+		gfc_line_cpy(playerParty.fiendNames[i], sj_get_string_value(sj_array_get_nth(party, i)));
 		for (int j = 0; j < playerMenagerie.fiendCount; j++) {
-			if (gfc_word_cmp(playerParty.fiendNames[members - 1 - i], playerMenagerie.fiends[j]->name)) {
-				playerParty.fiends[members - 1 - i] = playerMenagerie.fiends[j];
+			if (!gfc_word_cmp(playerParty.fiendNames[i], playerMenagerie.fiends[j]->name)) {
+				playerParty.fiends[i] = playerMenagerie.fiends[j];
+				playerParty.slotsTaken += playerMenagerie.fiends[j]->size;
 				break;
 			}
 		}
@@ -78,7 +127,9 @@ int party_get_member_count() {
 Entity* party_read_member(int member) {
 	if (!(playerParty.fiends[member])) return NULL;
 	Entity* fiend = entity_new();
+	fiend->type = ET_Fiend;
 	fiend->data = playerParty.fiends[member];
+	((FiendData*)(fiend->data))->entity = fiend;
 	return fiend;
 }
 FiendData* party_read_member_data(int member) {
@@ -124,34 +175,38 @@ FiendData* read_fiend(const char* species) {
 	sj_get_integer_value(sj_object_get_value(selectedFiend, "rank"), &(data->rank));
 	data->sprite = gf2d_sprite_load_all(sj_object_get_value_as_string(selectedFiend, "sprite"), ((data->size < 3) ? 64 : 128), 64, 1, 0);
 
-	TextWord type;
-	gfc_word_cpy(type, sj_object_get_value_as_string(selectedFiend, "type"));
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend,"type")),"toughie")) {
+	
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "type")), "toughie")) {
 		slog("It's a toughie!");
 		data->type = FndT_Toughie;
 	}
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "type")), "trickster")){
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "type")), "trickster")) {
+		slog("It's a trickster!");
 		data->type = FndT_Trickster;
 	}
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "type")), "mage")){
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "type")), "mage")) {
+		slog("It's a mage!");
 		data->type = FndT_Mage;
 	}
 
 	TextWord tact;
 	gfc_word_cpy(tact, sj_object_get_value_as_string(selectedFiend, "tactic"));
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "tactic")), "destruction")) {
-		slog("It's a destroyer!");
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "tactic")), "destruction")) {
 		data->tactic = Destruction;
 	}
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "tactic")), "chaos")) {
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "tactic")), "chaos")) {
 		data->tactic = Chaos;
 	}
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "tactic")), "support")) {
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "tactic")), "support")) {
 		data->tactic = Support;
 	}
-	if (sj_string_cmp(sj_object_to_json_string(sj_object_get_value(selectedFiend, "tactic")), "magicless")) {
+	if (!gfc_word_cmp(sj_get_string_value(sj_object_get_value(selectedFiend, "tactic")), "magicless")) {
 		data->tactic = Magicless;
 	}
+
+	data->skills[0] = get_skill("Attack");
+	data->skills[1] = get_skill("Defend");
+
 	sj_echo(sj_object_get_value(selectedFiend, "stats"));
 	sj_get_integer_value(sj_array_get_nth(sj_array_get_nth(sj_object_get_value(selectedFiend, "stats"), MHP), 0), &(data->statsMin[MHP]));
 	sj_get_integer_value(sj_array_get_nth(sj_array_get_nth(sj_object_get_value(selectedFiend, "stats"), MMP), 0), &(data->statsMin[MMP]));
@@ -168,6 +223,7 @@ FiendData* read_fiend(const char* species) {
 	sj_get_integer_value(sj_array_get_nth(sj_array_get_nth(sj_object_get_value(selectedFiend, "stats"), AGL), 1), &(data->statsMax[AGL]));
 
 	sj_free(file);
+
 	return data;
 }
 
@@ -193,4 +249,64 @@ int calculate_stat(int minimum, int maximum, int level) {
 	}
 	
 	return (int)roundf(a * powf(b,level));
+}
+
+Bool fiend_name_taken(TextLine query) {
+	if (!query) return false;
+	for (int i = 0; i < playerMenagerie.fiendCount; i++) {
+		if (!gfc_line_cmp(query, playerMenagerie.fiends[i]->name))
+			return true;
+	}
+	return false;
+}
+
+void fiend_register_new(FiendData* newFiend) {
+	if (!newFiend) return;
+	playerMenagerie.fiends[playerMenagerie.fiendCount] = newFiend;
+	playerMenagerie.fiendCount++;
+}
+
+void party_add_fiend(FiendData* newFiend) {
+	if (!newFiend) return;
+	if (playerParty.unitCount >= 4) return;
+	//if (playerParty.slotsTaken + newFiend->size > 4) return;
+	playerParty.slotsTaken += newFiend->size;
+	gfc_line_cpy(playerParty.fiendNames[playerParty.unitCount], newFiend->name);
+	playerParty.fiends[playerParty.unitCount] = newFiend;
+	playerParty.unitCount++;
+}
+
+SJson* menagerie_get_as_json() {
+	SJson* toExport = sj_object_new();
+	if (!toExport) return NULL;
+	for (int i = 0; i < 100; i++) {
+		if (!playerMenagerie.fiends[i]) continue;
+		TextLine name;
+		gfc_word_cpy(name, playerMenagerie.fiends[i]->name);
+		TextLine species;
+		gfc_word_cpy(species, playerMenagerie.fiends[i]->species);
+		int level = playerMenagerie.fiends[i]->level;
+		TextWord tactic;
+		switch (playerMenagerie.fiends[i]->tactic) {
+		case Destruction:
+			gfc_word_cpy(tactic, "destruction");
+			break;
+		case Chaos:
+			gfc_word_cpy(tactic, "chaos");
+			break;
+		case Support:
+			gfc_word_cpy(tactic, "support");
+			break;
+		case Magicless:
+			gfc_word_cpy(tactic, "magicless");
+			break;
+		}
+		SJson* fiend = sj_object_new();
+		if (!fiend) return NULL;
+		sj_object_insert(fiend, "species", sj_new_str(species));
+		sj_object_insert(fiend, "level", sj_new_int(level));
+		sj_object_insert(fiend, "tactic", sj_new_str(tactic));
+		sj_object_insert(toExport, name, fiend);
+	}
+	return toExport;
 }

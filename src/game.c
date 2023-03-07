@@ -4,9 +4,11 @@
 #include "gf2d_font.h"
 #include "gfc_input.h"
 #include "simple_logger.h"
+#include "totw_game_status.h"
 #include "totw_entity.h"
 #include "totw_fiend.h"
 #include "totw_gui.h"
+#include "totw_bgm.h"
 #include "totw_battle.h"
 
 static Bool quitNow = false;
@@ -21,11 +23,13 @@ void new_battle() {
     generate_new_battle("dummy",1);
     changed = true;
     gfc_block_cpy(battleDialogue,"Fiends approach!\nCourse of action?");
+    bgm_play_loop(BGM_Battle);
 }
 void new_hard_battle() {
     generate_new_battle("stupid",1);
     changed = true;
     gfc_block_cpy(battleDialogue,"Fiends approach!\nCourse of action?");
+    bgm_play_loop(BGM_Boss);
 }
 void fight() {
     if (!in_battle()) return;
@@ -54,6 +58,7 @@ int main(int argc, char * argv[])
     Color mouseColor = gfc_color8(255,100,255,200);
     Vector2D renderSize = vector2d(300, 180);
     Vector2D renderScale = vector2d(5, 5);
+    game_set_resolution(renderSize.x, renderSize.y);
     
     /*program initializtion*/
     init_logger("gf2d.log");
@@ -67,6 +72,7 @@ int main(int argc, char * argv[])
         vector4d(200,200,200,255),
         0);
     gf2d_graphics_set_frame_delay(16);
+    gfc_audio_init(32, 8, 0, 2, 1, 1);
     gf2d_sprite_init(1024);
     gf2d_font_init("config/font.cfg");
     SDL_ShowCursor(SDL_ENABLE);
@@ -180,6 +186,7 @@ int main(int argc, char * argv[])
         ((OptionData*)(bO_Die->data))->onSelect = quit;
     }
     */
+    game_set_state(GS_Title);
     /*main game loop*/
     while(!done)
     {
@@ -193,13 +200,20 @@ int main(int argc, char * argv[])
 
         entity_think_all();
         entity_update_all();
-        battle_update();
-        if (gfc_input_controller_button_pressed(0, "triangle")) {
+        if (gfc_input_controller_button_pressed(0,"Options")) {
+            if (game_get_state() == GS_Battle)
+                slog("You can't save in a battle, silly! What, do you think this is Undertale?");
+            else
+                game_save();
+        }
+        if (game_get_state() == GS_Battle);
+            battle_update();
+        if (game_get_state() != GS_Battle && game_get_state() != GS_Naming && gfc_input_controller_button_pressed(0, "triangle")) {
             if (in_battle())
                 kill_battle();
             new_battle();
         }
-        else if (gfc_input_controller_button_pressed(0, "square")) {
+        else if (game_get_state() != GS_Battle && game_get_state() != GS_Naming && gfc_input_controller_button_pressed(0, "square")) {
             if (in_battle())
                 kill_battle();
             new_hard_battle();
@@ -233,8 +247,8 @@ int main(int argc, char * argv[])
                 &mouseColor,
                 (int)mf);*/
         gf2d_graphics_next_frame();// render current draw frame and skip to the next frame
-        
-        if (keys[SDL_SCANCODE_ESCAPE] || quitNow)done = 1; // exit condition
+        bgm_update();
+        if (keys[SDL_SCANCODE_ESCAPE] || game_get_quitting())done = 1; // exit condition
         //slog("Rendering at %f FPS",gf2d_graphics_get_frames_per_second());
     }
     slog("---==== END ====---");
