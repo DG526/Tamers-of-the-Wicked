@@ -209,7 +209,13 @@ void battle_handle_outcome() {
 		Sound* victoryTune = gfc_sound_load("audio/sfx/Victory.mp3", 1, 2);
 		gfc_sound_play(victoryTune, 0, 1, -1, -1);
 		gfc_sound_free(victoryTune);
-		battle_wait(1500);
+		battle_wait(1000);
+		battle.victorious = true;
+		battle.turn = 0;
+		for (int i = 1; i <= party_get_member_count(); i++) {
+			if (battle_get_party_member(1, i)->HP > 0)
+				battle_get_party_member(1, i)->exp += battle.accumulatedEXP;
+		}
 		return;
 	}
 }
@@ -698,10 +704,58 @@ void battle_update() {
 		break;
 	case BP_Ending:
 		if (battle.timeForMove <= SDL_GetTicks64()) {
-			if (gfc_input_controller_button_pressed_by_index(0, 0))
-			{
-				kill_battle();
-				return;
+			if (battle.victorious) {
+				if (gfc_input_controller_button_pressed_by_index(0, 0))
+				{
+					switch (battle.turn) {
+					case 0: {
+						TextBlock disp = "";
+						sprintf(disp, "Your party gains %i exp.", battle.accumulatedEXP);
+						battle_set_main_dialogue(disp);
+						battle.turn++;
+						battle.turnPhase = 0;
+						break;
+					}
+					case 1:
+					case 2:
+					case 3:
+					case 4: 
+						if (!battle_get_party_member(1, battle.turn)) {
+							battle.turn++;
+							battle.turnPhase = 0;
+						}
+						else {
+							static Bool leveledUp = false;
+							if (battle.turnPhase == 0)
+								leveledUp = false;
+							int doneStep = fiend_check_level_up(battle_get_party_member(1, battle.turn), &(((TextData*)(battle.gui.textDisplay.text->data))->text), &(battle.turnPhase), &leveledUp);
+							if (battle.turnPhase == 1 && leveledUp) {
+								battle_wait(600);
+								//Play sound here.
+							}
+							if (doneStep) {
+								battle.turn++;
+								battle.turnPhase = 0;
+							}
+							if (leveledUp)
+								break;
+						}
+					case 5:
+						//Monetary gain here!
+						battle.turn++;
+						//break;
+					case 6:
+						kill_battle();
+						return;
+					}
+				}
+			}
+			else {
+				if (gfc_input_controller_button_pressed_by_index(0, 0))
+				{
+					kill_battle();
+					return;
+				}
 			}
 		}
 	}
@@ -720,4 +774,8 @@ void battle_update() {
 
 float battle_get_recruit_chance() {
 	return battle.recruitChance;
+}
+
+void battle_add_exp(int exp) {
+	battle.accumulatedEXP += exp;
 }

@@ -130,4 +130,6 @@ void fiend_part_ways(TextLine name);
 void party_add_fiend(FiendData* newFiend);
 void party_remove_fiend(TextLine name);
 
+int fiend_check_level_up(FiendData* self, TextBlock* textDisplay, int* step, Bool* leveledUp);
+
 #endif

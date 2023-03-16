@@ -109,6 +109,7 @@ int skill_attack(int userParty, int userFiend, int targetParty, int targetFiend,
 		sprintf(sbuf, "%s attacks!\nDeals %i damage to %s!\n%s has fallen.", userData->name, effectValue, targetData->name, targetData->name);
 		slog(sbuf);
 		battle_set_main_dialogue(sbuf);
+		if (targetData->party == 2) battle_add_exp(targetData->exp);
 		battle_wait(700);
 		break;
 	}

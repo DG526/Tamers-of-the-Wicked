@@ -93,6 +93,8 @@ typedef struct Battle_S {
 	int recruitTarget;
 	float recruitChance;
 	int recruitAttempt;
+
+	Bool victorious;
 }Battle;
 void kill_battle();
 int in_battle();
@@ -109,5 +111,7 @@ int startRound_fight(void* target);
 int startRound_recruit(void* target);
 void battle_impress_enemy(float percent);
 float battle_get_recruit_chance();
+
+void battle_add_exp(int exp);
 
 #endif

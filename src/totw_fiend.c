@@ -286,6 +286,7 @@ SJson* menagerie_get_as_json() {
 		TextLine species;
 		gfc_word_cpy(species, playerMenagerie.fiends[i]->species);
 		int level = playerMenagerie.fiends[i]->level;
+		int xp = playerMenagerie.fiends[i]->exp;
 		TextWord tactic;
 		switch (playerMenagerie.fiends[i]->tactic) {
 		case Destruction:
@@ -305,8 +306,63 @@ SJson* menagerie_get_as_json() {
 		if (!fiend) return NULL;
 		sj_object_insert(fiend, "species", sj_new_str(species));
 		sj_object_insert(fiend, "level", sj_new_int(level));
+		sj_object_insert(fiend, "exp", sj_new_int(xp));
 		sj_object_insert(fiend, "tactic", sj_new_str(tactic));
 		sj_object_insert(toExport, name, fiend);
 	}
 	return toExport;
+}
+
+int exp_required_at_level(int level, int rank) {
+	float expReq = (powf((level - 1) / 0.2f, 1.2f) + 15) * (1 + 0.25 * rank);
+	return (int)(roundf(expReq));
+}
+
+int fiend_check_level_up(FiendData* self, TextBlock* textDisplay, int* step, Bool* leveledUp) {
+	if (!self || !textDisplay || !step) return 1;
+	static int hpG, mpG, atkG, defG, pwrG, aglG;
+	switch (*step) {
+	case 0: {
+		int levels = 0;
+		int requirement = exp_required_at_level(self->level, self->rank);
+		while (self->exp >= requirement) {
+			levels++;
+			self->exp -= requirement;
+			requirement = exp_required_at_level(self->level + levels, self->rank);
+		}
+		if (levels) {
+			*leveledUp = true;
+			TextBlock disp = "";
+			sprintf(disp, "%s has leveled up to level %i!", self->name, self->level + levels);
+			battle_set_main_dialogue(disp);
+			//gfc_block_cpy(*textDisplay, disp);
+
+			self->level += levels;
+			int statBase[6] = { self->stats[0],self->stats[1],self->stats[2],self->stats[3],self->stats[4],self->stats[5] };
+			calculate_stats(self);
+			hpG = self->stats[MHP] - statBase[MHP];
+			mpG = self->stats[MMP] - statBase[MMP];
+			atkG = self->stats[ATK] - statBase[ATK];
+			defG = self->stats[DEF] - statBase[DEF];
+			pwrG = self->stats[PWR] - statBase[PWR];
+			aglG = self->stats[AGL] - statBase[AGL];
+		}
+		else {
+			return 1;
+		}
+		break;
+	}
+	case 1:
+		if (*leveledUp) {
+			TextBlock dispM = "", dispA = "", dispB = "", dispC = "";
+			sprintf(dispM, "HP + %i                MP + %i\nATK + %i                DEF + %i\nPWR + %i                AGL + %i", hpG, mpG, atkG, defG, pwrG, aglG);
+			battle_set_main_dialogue(dispM);
+			//gfc_block_cpy(*textDisplay, dispM);
+		}
+		break;
+	case 2: 
+		return 1;
+	}
+	*step += 1;
+	return 0;
 }
