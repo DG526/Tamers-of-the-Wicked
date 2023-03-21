@@ -1,6 +1,7 @@
 #include "simple_logger.h"
 #include "totw_game_status.h"
 #include "totw_bgm.h"
+#include "totw_camera.h"
 #include "totw_battle.h"
 #include "totw_naming_screen.h"
 
@@ -179,6 +180,12 @@ void switchPhase(BattlePhase phase) {
 		break;
 	}
 }
+int flee(void* unused) {
+	battle_set_main_dialogue("Run for your lives!");
+	switchPhase(BP_Ending);
+	bgm_pause();
+	return 1;
+}
 int changeDialogue(void* text) {
 	switch (battle.phase) {
 	case BP_Opening:
@@ -342,7 +349,7 @@ void load_battle_basics() {
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->onHover = changeDialogue;
 	memcpy(textPresets[5], "Flee:\n    Attempt to escape", sizeof(TextBlock));
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->hoverArgument = &textPresets[5];
-	((OptionData*)(battle.gui.choice_initial.opFlee->data))->onChoose = changeDialogue;
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->onChoose = flee;
 	memcpy(textPresets[6], "Whoops, can't do that yet.", sizeof(TextBlock));
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->choiceArgument = &textPresets[6];
 
@@ -423,7 +430,7 @@ void generate_new_battle(TextWord dungeon, int poolID) {
 		return;
 	}
 	char* sbuf[20];
-	sprintf(sbuf, "dungeon-%s", dungeon);
+	sprintf(sbuf, dungeon);
 	SJson* dungeonData = sj_object_get_value(battleFile, sbuf);
 	if (!dungeonData) {
 		slog("Could not find dungeon battle data in battles.cfg!");
@@ -520,7 +527,80 @@ void generate_new_battle(TextWord dungeon, int poolID) {
 	}
 	battle.active = true;
 	load_battle_basics();
+	camera_set_position(vector2d(0,0));
 	game_set_state(GS_Battle);
+	bgm_play_loop(BGM_Battle);
+}
+void load_boss_battle(char* bossName) {
+	SJson* battleFile = sj_load("config/bosses.cfg");
+	if (!battleFile) {
+		slog("Could not load battles.cfg!");
+		return;
+	}
+	SJson* bossData = sj_object_get_value(sj_object_get_value(battleFile, bossName), "battle");
+	if (!bossData) {
+		slog("Could not find battle data in bosses.cfg!");
+		sj_free(battleFile);
+		return;
+	}
+	int num = 0;
+	int pos = 0;
+	for (; num < sj_array_get_count(bossData);) {
+		SJson* particular = sj_array_get_nth(bossData, num);
+		FiendData* data = read_fiend(sj_get_string_value(sj_object_get_value(particular, "species")));
+		Entity* foe = entity_new();
+		foe->type = ET_Fiend;
+		slog("Fiend entity created.");
+		int level = 1;
+		sj_get_integer_value(sj_object_get_value(particular, "level"), &level);
+		slog("Fiend @ level %i.", level);
+		int exp = 0;
+		sj_get_integer_value(sj_object_get_value(particular, "exp"), &exp);
+		slog("Fiend has %i exp worth.", exp);
+		data->exp = exp;
+		data->level = level;
+		data->party = 2;
+		gfc_line_cpy(data->species, sj_get_string_value(sj_object_get_value(particular, "species")));
+		gfc_line_cpy(data->name, sj_get_string_value(sj_object_get_value(particular, "name")));
+		slog("Copied boss name.");
+		foe->data = data;
+		slog("Copied reference to fiend data.");
+		battle.battlers[num] = foe;
+		slog("Fiend added to list of battlers.");
+		foe->sprite = data->sprite;
+
+		foe->position = vector2d(pos, 8);
+		pos += foe->sprite->frame_w + 4;
+
+		//calculate_stats(data);
+		for (int i = 0; i < 6; i++) {
+			sj_get_integer_value(sj_array_get_nth(sj_object_get_value(particular, "stats"), i), &(data->stats[i]));
+		}
+		data->HP = data->stats[MHP];
+		data->MP = data->stats[MMP];
+
+		data->entity = foe;
+
+		num++;
+	}
+
+	int xOffset = 150 - (pos - 4) / 2;
+	for (int i = 0; i < num; i++) {
+		vector2d_add(battle.battlers[i]->position, battle.battlers[i]->position, vector2d(xOffset, 0));
+	}
+	for (int i = 0; i < party_get_member_count(); i++) {
+		battle.battlers[num + i] = party_read_member(i);
+		((FiendData*)(battle.battlers[num + i]->data))->party = 1;
+	}
+	battle.active = true;
+	load_battle_basics();
+	battle_set_main_dialogue(sj_get_string_value(sj_object_get_value(sj_object_get_value(battleFile, bossName), "dialogue")));
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->grayed = true;
+	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->grayed = true;
+	sj_free(battleFile);
+	camera_set_position(vector2d(0, 0));
+	game_set_state(GS_Battle);
+	bgm_play_loop(BGM_Boss);
 }
 
 int battle_handle_recruit_outcome(int* phase) {

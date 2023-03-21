@@ -100,7 +100,7 @@ void kill_battle();
 int in_battle();
 void battle_wait(int milliseconds);
 void generate_new_battle(TextWord dungeon, int poolID);
-void load_boss_battle(int battleID);
+void load_boss_battle(char* bossName);
 
 void battle_update();
 

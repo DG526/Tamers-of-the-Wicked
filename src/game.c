@@ -10,6 +10,8 @@
 #include "totw_gui.h"
 #include "totw_bgm.h"
 #include "totw_battle.h"
+#include "totw_level.h"
+#include "totw_player.h"
 
 static Bool quitNow = false;
 static Bool changed = false;
@@ -20,26 +22,16 @@ void quit() {
     quitNow = true;
 }
 void new_battle() {
-    generate_new_battle("dummy",1);
+    generate_new_battle("dungeon-dummy",1);
     changed = true;
     gfc_block_cpy(battleDialogue,"Fiends approach!\nCourse of action?");
     bgm_play_loop(BGM_Battle);
 }
 void new_hard_battle() {
-    generate_new_battle("stupid",1);
+    generate_new_battle("dungeon-stupid",1);
     changed = true;
     gfc_block_cpy(battleDialogue,"Fiends approach!\nCourse of action?");
     bgm_play_loop(BGM_Boss);
-}
-void fight() {
-    if (!in_battle()) return;
-    changed = true;
-    gfc_block_cpy(battleDialogue,"Hey, wait a sec...\nyou can't do that yet...");
-}
-void flee() {
-    if (!in_battle()) return;
-    changed = true;
-    gfc_block_cpy(battleDialogue,"Couldn't get away!");
 }
 
 int main(int argc, char * argv[])
@@ -59,6 +51,7 @@ int main(int argc, char * argv[])
     Vector2D renderSize = vector2d(300, 180);
     Vector2D renderScale = vector2d(5, 5);
     game_set_resolution(renderSize.x, renderSize.y);
+    Level* currentMap;
     
     /*program initializtion*/
     init_logger("gf2d.log");
@@ -94,99 +87,19 @@ int main(int argc, char * argv[])
     barFill = gf2d_sprite_load_all("images/bar_fill.png", 4, 4, 1, 0);
     int spacing = 4;
     int hudStartY = 2 * spacing + 64;
-    /*
-    GUI* bDialogueFrame = gui_window_create(vector2d(4, hudStartY + 4), vector2d(renderSize.x - 8, renderSize.y / 2 - 8 - 28), 0, panel);
-    GUI* bDialogue = gui_text_create(vector2d(10, hudStartY + 10), "", 1, 1);
+
+    player_new();
+    if (player_get()) slog("Successfully created player.");
+
+    level_set_active_level(level_load("maps/dungeon-1-1.map"));
+    if (!level_get_active_level()) slog("Couldn't create level.");
     
-    GUI* bO_Fight = gui_option_create(vector2d(renderSize.x / 2, hudStartY + 10), "Fight", true, 1, cursor);
-    GUI* bO_Flee = gui_option_create(vector2d(renderSize.x / 2, hudStartY + 10 + 12), "Flee", false, 1, cursor);
-    GUI* bO_Die = gui_option_create(vector2d(renderSize.x / 2, hudStartY + 10 + 24), "Pass Out", false, 1, cursor);
-    */
-    /*
-    Entity* p1 = party_read_member(0);
-    slog("Basic fiend data read.");
-    FiendData* dat = party_read_member_data(0);
-    slog("Successfully loaded fiend, with size of %i, and stats of %i, %i, %i, %i, %i, %i.",dat->size,dat->stats[MHP],dat->stats[MMP],dat->stats[ATK],dat->stats[DEF],dat->stats[PWR],dat->stats[AGL]);
-
-    char* numBuf[4];
-    GUI* allyFrame1 = gui_window_create(vector2d(0, renderSize.y - 48), vector2d(renderSize.x / 4, 60), 0, panel);
-    GUI* allyName1 = gui_text_create(vector2d(6, renderSize.y - 44), dat->name,false,1);
-    sprintf(numBuf, "%i", dat->HP);
-    GUI* hNum1 = gui_text_create(vector2d(4, renderSize.y - 28), numBuf, false, 2);
-    sprintf(numBuf, "%i", dat->MP);
-    GUI* mNum1 = gui_text_create(vector2d(4, renderSize.y - 15), numBuf, false, 2);
-    GUI* hbar1 = gui_meter_create(vector2d(5 + 24, renderSize.y - 27), vector2d(renderSize.x / 4 - 32, 8), gfc_color(1, 0, 0, 1), 1, barFrame, barFill);
-    GUI* mbar1 = gui_meter_create(vector2d(5 + 24, renderSize.y - 14), vector2d(renderSize.x / 4 - 32, 8), gfc_color(0, 0, 0.8, 1), 1, barFrame, barFill);
-    ((MeterData*)(hbar1->data))->fill = (float)dat->HP / (float)dat->stats[MHP];
-    ((MeterData*)(mbar1->data))->fill = (float)dat->MP / (float)dat->stats[MMP];
-
-    Entity* p2 = party_read_member(1);
-    slog("Basic fiend data read.");
-    dat = party_read_member_data(1);
-    slog("Successfully loaded fiend, with size of %i, and stats of %i, %i, %i, %i, %i, %i.", dat->size, dat->stats[MHP], dat->stats[MMP], dat->stats[ATK], dat->stats[DEF], dat->stats[PWR], dat->stats[AGL]);
-
-    GUI* allyFrame2 = gui_window_create(vector2d(renderSize.x / 4, renderSize.y - 48), vector2d(renderSize.x / 4, 60), 0, panel);
-    GUI* allyName2 = gui_text_create(vector2d(renderSize.x / 4 + 6, renderSize.y - 44), dat->name,false,1);
-    sprintf(numBuf, "%i", dat->HP);
-    GUI* hNum2 = gui_text_create(vector2d(renderSize.x / 4 + 4, renderSize.y - 28), numBuf, false, 2);
-    sprintf(numBuf, "%i", dat->MP);
-    GUI* mNum2 = gui_text_create(vector2d(renderSize.x / 4 + 4, renderSize.y - 15), numBuf, false, 2);
-    GUI* hbar2 = gui_meter_create(vector2d(renderSize.x / 4 + 5 + 24, renderSize.y - 27), vector2d(renderSize.x / 4 - 32, 8), gfc_color(1, 0, 0, 1), 1, barFrame, barFill);
-    GUI* mbar2 = gui_meter_create(vector2d(renderSize.x / 4 + 5 + 24, renderSize.y - 14), vector2d(renderSize.x / 4 - 32, 8), gfc_color(0, 0, 0.8, 1), 1, barFrame, barFill);
-    ((MeterData*)(hbar2->data))->fill = (float)dat->HP / (float)dat->stats[MHP];
-    ((MeterData*)(mbar2->data))->fill = (float)dat->MP / (float)dat->stats[MMP];
-
-    allyFrame1->visible = true;
-    allyName1->visible = true;
-    hNum1->visible = true;
-    mNum1->visible = true;
-    hbar1->visible = true;
-    mbar1->visible = true;
-    allyFrame2->visible = true;
-    allyName2->visible = true;
-    hNum2->visible = true;
-    mNum2->visible = true;
-    hbar2->visible = true;
-    mbar2->visible = true;
-    */
-    /*
-    GUI* allyFrame3 = gui_window_create(vector2d(renderSize.x / 2, renderSize.y - 48), vector2d(renderSize.x / 4, 60), 0, panel);
-    GUI* allyName3 = gui_text_create(vector2d(renderSize.x / 2 + 6, renderSize.y - 44), "Nialliv",false,1);
-    sprintf(numBuf, "%i", 32);
-    GUI* hNum3 = gui_text_create(vector2d(renderSize.x / 2 + 4, renderSize.y - 28), numBuf, false, 2);
-    sprintf(numBuf, "%i", 75);
-    GUI* mNum3 = gui_text_create(vector2d(renderSize.x / 2 + 4, renderSize.y - 15), numBuf, false, 2);
-    GUI* hbar3 = gui_meter_create(vector2d(renderSize.x / 2 + 5 + 24, renderSize.y - 27), vector2d(renderSize.x / 4 - 32, 8), gfc_color(1, 0, 0, 1), 1, barFrame, barFill);
-    GUI* mbar3 = gui_meter_create(vector2d(renderSize.x / 2 + 5 + 24, renderSize.y - 14), vector2d(renderSize.x / 4 - 32, 8), gfc_color(0, 0, 0.8, 1), 1, barFrame, barFill);
-    ((MeterData*)(hbar3->data))->fill = ((float)32 / (float)170);
-    ((MeterData*)(mbar3->data))->fill = ((float)75 / (float)236);
-
-    GUI* allyFrame4 = gui_window_create(vector2d(3 * renderSize.x / 4, renderSize.y - 48), vector2d(renderSize.x / 4, 60), 0, panel);
-    GUI* allyName4 = gui_text_create(vector2d(3 * renderSize.x / 4 + 6, renderSize.y - 44), "Dnegel", false, 1);
-    sprintf(numBuf, "%i", 723);
-    GUI* hNum4 = gui_text_create(vector2d(3 * renderSize.x / 4 + 4, renderSize.y - 28), numBuf, false, 2);
-    sprintf(numBuf, "%i", 523);
-    GUI* mNum4 = gui_text_create(vector2d(3 * renderSize.x / 4 + 4, renderSize.y - 15), numBuf, false, 2);
-    GUI* hbar4 = gui_meter_create(vector2d(3 * renderSize.x / 4 + 5 + 24, renderSize.y - 27), vector2d(renderSize.x / 4 - 32, 8), gfc_color(1, 0, 0, 1), 1, barFrame, barFill);
-    GUI* mbar4 = gui_meter_create(vector2d(3 * renderSize.x / 4 + 5 + 24, renderSize.y - 14), vector2d(renderSize.x / 4 - 32, 8), gfc_color(0, 0, 0.8, 1), 1, barFrame, barFill);
-    ((MeterData*)(hbar4->data))->fill = ((float)723 / (float)999);
-    ((MeterData*)(mbar4->data))->fill = ((float)523 / (float)999);
     
-    if (bO_Fight && bO_Flee && bO_Die) {
-        ((OptionData*)(bO_Fight->data))->up = bO_Die;
-        ((OptionData*)(bO_Fight->data))->down = bO_Flee;
-        ((OptionData*)(bO_Fight->data))->onSelect = fight;
-        
-        ((OptionData*)(bO_Flee->data))->up = bO_Fight;
-        ((OptionData*)(bO_Flee->data))->down = bO_Die;
-        ((OptionData*)(bO_Flee->data))->onSelect = flee;
-        
-        ((OptionData*)(bO_Die->data))->up = bO_Flee;
-        ((OptionData*)(bO_Die->data))->down = bO_Fight;
-        ((OptionData*)(bO_Die->data))->onSelect = quit;
-    }
-    */
-    game_set_state(GS_Title);
+    player_set_coords(vector2d(27, 4));
+    player_set_dir(West);
+    ((PlayerData*)(player_get()->data))->battleSteps = level_get_active_level()->encounterSteps + gfc_crandom() * level_get_active_level()->encounterVariance;
+
+    game_set_state(GS_Roaming);
     /*main game loop*/
     while(!done)
     {
@@ -197,7 +110,7 @@ int main(int argc, char * argv[])
         mf+=0.1;
         if (mf >= 16.0)mf = 0;
         gfc_input_update();
-
+        
         entity_think_all();
         entity_update_all();
         if (gfc_input_controller_button_pressed(0,"Options")) {
@@ -206,17 +119,22 @@ int main(int argc, char * argv[])
             else
                 game_save();
         }
-        if (game_get_state() == GS_Battle);
+        switch (game_get_state()) {
+        case GS_Battle:
             battle_update();
-        if (game_get_state() != GS_Battle && game_get_state() != GS_Naming && gfc_input_controller_button_pressed(0, "triangle")) {
-            if (in_battle())
-                kill_battle();
-            new_battle();
-        }
-        else if (game_get_state() != GS_Battle && game_get_state() != GS_Naming && gfc_input_controller_button_pressed(0, "square")) {
-            if (in_battle())
-                kill_battle();
-            new_hard_battle();
+            break;
+        case GS_Roaming:
+            /*if (gfc_input_controller_button_pressed(0, "triangle")) {
+                if (in_battle())
+                    kill_battle();
+                new_battle();
+            }
+            else if (gfc_input_controller_button_pressed(0, "square")) {
+                if (in_battle())
+                    kill_battle();
+                new_hard_battle();
+            }*/
+            break;
         }
         /*
         if (changed) {
@@ -233,6 +151,9 @@ int main(int argc, char * argv[])
             //gf2d_sprite_draw_image(sprite,vector2d(0,0));
             
             //UI elements last
+            if (game_get_state() == GS_Roaming && level_get_active_level()) {
+                level_draw(level_get_active_level());
+            }
             entity_draw_all();
             gui_draw_all();
             //gf2d_font_draw_line_tag("Fiends approach!\nCourse of action?", FT_Normal, gfc_color(0, 0, 0, 1), vector2d(12, renderSize.y / 2 + 12));

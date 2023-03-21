@@ -1,6 +1,8 @@
 #include "simple_logger.h"
+#include "totw_camera.h"
 #include "totw_entity.h"
 #include "totw_fiend.h"
+#include "totw_game_status.h"
 
 
 typedef struct {
@@ -81,10 +83,14 @@ void entity_draw(Entity* ent) {
 		FiendData* data = (FiendData*)(ent->data);
 		if (data->HP == 0) return;
 	}
+	if ((ent->type == ET_Player || ent->type == ET_Interactible) && (game_get_state() == GS_Battle || game_get_state() == GS_Naming || game_get_state() == GS_Title))
+		return;
+	Vector2D drawPos;
+	vector2d_add(drawPos, ent->position, camera_get_draw_offset());
 	if (ent->sprite) {
 		gf2d_sprite_draw(
 			ent->sprite,
-			ent->position,
+			drawPos,
 			&(ent->scale),
 			NULL,
 			NULL,
@@ -105,8 +111,10 @@ void entity_draw_all() {
 
 void entity_update(Entity* ent) {
 	if (!ent) return;
+	ent->frame += ent->frameSpeed;
+	if (ent->frame >= ent->frameMax + 1)
+		ent->frame = ent->frameMin;
 	if (ent->update) ent->update(ent);
-	//DO STUFF HERE!
 }
 
 void entity_update_all() {

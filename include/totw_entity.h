@@ -9,8 +9,16 @@
 typedef enum {
 	ET_Player,
 	ET_Fiend,
+	ET_Interactible,
 	ET_NamingSystem
 }EntityType;
+
+typedef enum {
+	South, //Facing Down
+	West, //Facing Left
+	North, //Facing Up
+	East //Facing Right
+}CompassDirection;
 
 typedef struct Entity_S
 {
@@ -18,11 +26,17 @@ typedef struct Entity_S
 	EntityType type;
 	Sprite* sprite;
 	float frame;
+	float frameSpeed;
+	int frameMin, frameMax;
 	Vector2D position;
+	Vector2D mapPosition; //For entities on a map's grid.
 	Vector2D scale;
 
 	void (*update)(struct Entity_S* self);
 	void (*think)(struct Entity_S* self);
+
+	void (*interact)(struct Entity_S* self);
+	Bool interacted;
 
 	void* data;
 }Entity;

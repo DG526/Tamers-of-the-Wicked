@@ -1,9 +1,11 @@
 {
-"tileSet":{
 	"sprite":"images/tilesets/dungeonTiles.png"
 	"tileSize":[32,32],
-	"tilesPerRow":[2],
+	"tilesPerRow":3,
 	"tiles":[
+		{
+			"passable":0
+		},
 		{
 			"passable":1
 		},
@@ -11,5 +13,4 @@
 			"passable":0
 		}
 	]
-}
 }

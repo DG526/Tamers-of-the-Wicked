@@ -1,30 +1,35 @@
-# gameframework2d (GF2D)
-a collection of utlitity functions designed to facilitate creating 2D games with SDL2
-This project is specifically intended to function as an educational tool for my students taking 2D Game Programming.
+# TAMERS OF THE WICKED
 
-FOR FULL FEATURES CHECKOUT THE MASTER BRANCH
-Students: Don't do that.  You are not ready.... yet.
+(You currently need a Dualshock 4 controller to play this game.)
 
-The main branch is kept deliberately minimal to allow students to build out systems as they are learning.
-Other branches have more complete system: Collisions, Windows, Armatures, Entities, Particles...
+# Completed features:
 
-# Build Process
+Personal:
+ - Tile-based movement in a tile-based world
+ - Turn-based team-based combat
+ - Random encounters and a Boss
+ - Monster growth and acquisition
+Common:
+ - Entity System
+ - Interactable environment
+ - UI
+ - File reading and writing
+ - This README file
 
-Before you can build the example code we are providing for you, you will need to obtain the libraries required
-by the source code
- - SDL2
- - SDL2_image
- - SDL2_mixer
- - SDL2_ttf
-There are additional sub modules that are needed for this project to work as well, but they can be pulled right from within the project.
-Performable from the following steps from the root of the cloned git repository within a terminal. 
 
-Make sure you fetch submodules: `git submodule update --init --recursive`
-Go into each submodule's src directory and type:
-`make`
-`make static`
+# Controls:
 
-Once each submodule has been made you can go into the base project src folder anre simply type:
-`make`
+In the dungeon:
+ - Directional buttons: Move
+ - Cross: Interact (There is currently only one interactable object.)
+ - Hold L1 + R1: Sneak (Try moving while holding this.) [DEMO ONLY]
+ - Options: Save game [DEMO ONLY]
 
-You should now have a `gf2d` binary within the root of your git repository. Executing this will start your game.
+In the battles:
+ - Directional buttons: Move cursor
+ - Cross: Select option
+
+When naming fiends:
+ - Directional buttons: Move cursor
+ - Cross: Select option
+ - Circle: Backspace

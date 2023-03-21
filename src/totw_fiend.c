@@ -74,6 +74,7 @@ void ally_list_load() {
 		SJson* fiend = sj_object_get_value(menagerie, name);
 		FiendData* data = read_fiend(sj_get_string_value(sj_object_get_value(fiend, "species")));
 		sj_get_integer_value(sj_object_get_value(fiend, "level"), &(data->level));
+		sj_get_integer_value(sj_object_get_value(fiend, "exp"), &(data->exp));
 		gfc_line_cpy(data->name, name);
 		playerMenagerie.fiends[i] = data;
 		calculate_stats(data);

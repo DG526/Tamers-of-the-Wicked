@@ -523,7 +523,7 @@ void gui_update(GUI* self) {
 		if (((OptionData*)(self->data))->selected && self->visible) {
 			if (gfc_input_controller_button_pressed_by_index(0, 0)) {
 				slog("Selected an option.");
-				if(((OptionData*)(self->data))->onChoose)
+				if(((OptionData*)(self->data))->onChoose && !((OptionData*)(self->data))->grayed)
 					((OptionData*)(self->data))->onChoose(((OptionData*)(self->data))->choiceArgument);
 				if (!self->inuse) return;
 			}
