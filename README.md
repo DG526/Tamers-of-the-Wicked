@@ -9,6 +9,7 @@ Personal:
  - Turn-based team-based combat
  - Random encounters and a Boss
  - Monster growth and acquisition
+ 
 Common:
  - Entity System
  - Interactable environment
