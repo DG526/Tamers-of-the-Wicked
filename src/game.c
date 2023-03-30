@@ -91,13 +91,13 @@ int main(int argc, char * argv[])
     player_new();
     if (player_get()) slog("Successfully created player.");
 
-    level_set_active_level(level_load("maps/dungeon-1-1.map"));
+    level_set_active_level(level_load("maps/base.map"));
+    //level_set_active_level(level_load("maps/dungeon-1-1.map"));
     if (!level_get_active_level()) slog("Couldn't create level.");
     
     
-    player_set_coords(vector2d(27, 4));
-    player_set_dir(West);
-    ((PlayerData*)(player_get()->data))->battleSteps = level_get_active_level()->encounterSteps + gfc_crandom() * level_get_active_level()->encounterVariance;
+    //player_set_coords(vector2d(27, 4));
+    //player_set_dir(West);
 
     game_set_state(GS_Roaming);
     /*main game loop*/

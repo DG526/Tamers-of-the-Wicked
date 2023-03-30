@@ -83,6 +83,7 @@ void level_free(Level* level);
 TileInfo tile_get(int column, int row);
 void tile_cpy(TileInfo* dst, TileInfo* src);
 void tile_set_occupier(Level* level, int column, int row, Entity* occupier);
+int tile_is_available(Level* level, int column, int row);
 Entity* tile_get_occupier(Level* level, int column, int row);
 
 Tileset tileset_load(const char* filename);

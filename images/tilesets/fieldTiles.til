@@ -1,0 +1,16 @@
+{
+	"sprite":"images/tilesets/fieldTiles.png"
+	"tileSize":[32,32],
+	"tilesPerRow":3,
+	"tiles":[
+		{
+			"passable":0
+		},
+		{
+			"passable":1
+		},
+		{
+			"passable":0
+		}
+	]
+}

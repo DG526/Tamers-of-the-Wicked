@@ -531,6 +531,148 @@ void generate_new_battle(TextWord dungeon, int poolID) {
 	game_set_state(GS_Battle);
 	bgm_play_loop(BGM_Battle);
 }
+
+SJson* pluck_rival(SJson* fullOptions, TextWord specialty, int* pointsLeft, int* pointCost) {
+	TextWord type, to = "toughie", tr = "trickster", ma = "mage";
+	gfc_word_cpy(type, specialty);
+	if (!gfc_word_cmp(specialty, "none")) {
+		int r = min(gfc_random() * 3, 2);
+		switch (r) {
+		case 0:
+			gfc_word_cpy(type, to);
+			break;
+		case 1:
+			gfc_word_cpy(type, tr);
+			break;
+		case 2:
+			gfc_word_cpy(type, ma);
+			break;
+		}
+	}
+	slog("%s, %s", specialty, type);
+	SJson* options = sj_object_get_value(fullOptions, type);
+	int opCount = sj_array_get_count(options);
+	if (opCount <= 0) return NULL;
+	int pick = min((int)(gfc_random() * opCount), opCount - 1);
+	slog("Picking option %i", pick);
+	SJson* chosen = sj_array_get_nth(options, pick);
+	if (!chosen) {
+		slog("Something went wrong with the enemy picker.");
+		return NULL;
+	}
+	int points = 0;
+	sj_get_integer_value(sj_object_get_value(chosen, "weight"), &points);
+	slog("Weight of option is %i", points);
+	*pointCost = points;
+	*pointsLeft -= points;
+	if (*pointsLeft < 0) return NULL; //went over
+	slog("Chose a rando.");
+	return chosen;
+}
+void generate_new_rival_battle(TextWord specialty, int difficulty) {
+	SJson* battleFile = sj_load("config/rivalFiends.cfg");
+	if (!battleFile) {
+		slog("Could not load rivalFiends.cfg!");
+		return;
+	}
+	int qMax = 25, qModLast;
+	int num = 0;
+	int pos = 0;
+	for (int slots = 4, errors = 0; slots > 0 && errors < 3;) {
+		slog("Trying new pluck iteration.");
+		if (qMax <= 0)
+			break;
+		SJson* search = pluck_rival(battleFile, specialty, &qMax, &qModLast);
+		if (qMax < 0)
+			break;
+		if (!search) {
+			slog("Search came up empty.");
+			errors++;
+			continue;
+		}
+		FiendData* data = read_fiend(sj_get_string_value(sj_object_get_value(search, "species")));
+		if (data->size > slots) {
+			slog("Fiend was too big!");
+			free(data);
+			errors++;
+			continue;
+		}
+		int level = 1;
+		sj_get_integer_value(sj_array_get_nth(sj_object_get_value(search, "level"), difficulty-1), &level);
+		if (level == 0) { //Fiend not available at this difficulty.
+			slog("Fiend cannot be at level 0.");
+			qMax += qModLast;
+			free(data);
+			continue;
+		}
+		Entity* foe = entity_new();
+		foe->type = ET_Fiend;
+		slog("Fiend entity created.");
+		slog("Fiend @ level %i.", level);
+		int emin, emax;
+		sj_get_integer_value(sj_array_get_nth(sj_object_get_value(search, "exp"),0), &emin);
+		sj_get_integer_value(sj_array_get_nth(sj_object_get_value(search, "exp"),1), &emax);
+		int exp = calculate_stat(emin, emax, level);
+		slog("Fiend has %i exp worth.", exp);
+		data->exp = exp;
+		data->level = level;
+		data->party = 2;
+		gfc_line_cpy(data->species, sj_get_string_value(sj_object_get_value(search, "species")));
+		gfc_line_cpy(data->name, sj_get_string_value(sj_object_get_value(search, "species")));
+		slog("Copied species name.");
+		foe->data = data;
+		slog("Copied reference to fiend data.");
+		slots -= data->size;
+		battle.battlers[num] = foe;
+		slog("Fiend added to list of battlers.");
+		foe->sprite = data->sprite;
+
+		foe->position = vector2d(pos, 8);
+		pos += foe->sprite->frame_w + 4;
+
+		calculate_stats(data);
+		data->HP = data->stats[MHP];
+		data->MP = data->stats[MMP];
+
+		data->entity = foe;
+
+		num++;
+	}
+
+	for (int i = 1; i <= 3; i++) {
+		FiendData* foeDat = battle_get_party_member(2, i);
+		if (!foeDat) break;
+		int dup = 0;
+		for (int j = i + 1; j <= 4; j++) {
+			FiendData* tgtFoe = battle_get_party_member(2, j);
+			if (!tgtFoe) break;
+			if (!gfc_line_cmp(foeDat->name, tgtFoe->name)) {
+				dup += 1;
+				sprintf(tgtFoe->name, "%s %c", tgtFoe->name, 'A' + dup);
+			}
+		}
+		if (dup) {
+			sprintf(foeDat->name, "%s %c", foeDat->name, 'A');
+		}
+	}
+
+	int xOffset = 150 - (pos - 4) / 2;
+	for (int i = 0; i < num; i++) {
+		vector2d_add(battle.battlers[i]->position, battle.battlers[i]->position, vector2d(xOffset, 0));
+	}
+	sj_free(battleFile);
+	for (int i = 0; i < party_get_member_count(); i++) {
+		battle.battlers[num + i] = party_read_member(i);
+		((FiendData*)(battle.battlers[num + i]->data))->party = 1;
+	}
+	battle.active = true;
+	load_battle_basics();
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->grayed = true;
+	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->grayed = true;
+	camera_set_position(vector2d(0, 0));
+	game_set_state(GS_Battle);
+	bgm_play_loop(BGM_Battle);
+}
 void load_boss_battle(char* bossName) {
 	SJson* battleFile = sj_load("config/bosses.cfg");
 	if (!battleFile) {

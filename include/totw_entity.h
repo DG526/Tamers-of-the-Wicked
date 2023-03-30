@@ -32,11 +32,17 @@ typedef struct Entity_S
 	Vector2D mapPosition; //For entities on a map's grid.
 	Vector2D scale;
 
+	int drawDepth;
+
+	Color color;
+
 	void (*update)(struct Entity_S* self);
 	void (*think)(struct Entity_S* self);
 
 	void (*interact)(struct Entity_S* self);
+	void (*onStepped)(struct Entity_S* self);
 	Bool interacted;
+	Bool solid;
 
 	void* data;
 }Entity;
@@ -54,6 +60,7 @@ void entity_manager_init(Uint32 max);
 Entity* entity_new();
 
 void entity_free(Entity* ent);
+void entity_free_interactibles();
 void entity_free_leave_data(Entity* ent);
 void entity_free_all();
 

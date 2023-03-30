@@ -135,7 +135,10 @@ void player_think(Entity* self) {
 		break;
 	case PS_Stopping: {
 		TileInfo newTile = tile_get(self->mapPosition.x, self->mapPosition.y);
-		if (newTile.encounterZone > 0 && !gfc_input_controller_button_held(0,"R1") && !gfc_input_controller_button_held(0,"L1")) {
+		if (newTile.occupier && newTile.occupier->onStepped) {
+			newTile.occupier->onStepped(newTile.occupier);
+		}
+		else if (newTile.encounterZone > 0 && !gfc_input_controller_button_held(0,"R1") && !gfc_input_controller_button_held(0,"L1")) {
 			data->battleSteps--;
 			if (data->battleSteps == 0) {
 				slog("Found a monster!");
@@ -225,7 +228,7 @@ Bool canMove(Entity* self, CompassDirection direction) {
 	}
 	TileInfo tile = tile_get(x, y);
 	//if (tile.solid) slog("Tile is solid.");
-	if (tile.occupier || tile.solid) { 
+	if ((tile.occupier && tile.occupier->solid) || tile.solid) {
 		//slog("Tile is occupied or solid.");
 		return false; 
 	}

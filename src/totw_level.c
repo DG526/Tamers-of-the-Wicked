@@ -9,6 +9,7 @@
 #include "totw_camera.h"
 #include "totw_level.h"
 #include "totw_overworld_ents.h";
+#include "totw_player.h";
 
 void level_build(Level* level);
 
@@ -128,8 +129,82 @@ Level* level_load(const char* filename)
             slog("Placed Boss");
             tile_set_occupier(level, x, y, boss);
         }
+        if (!strcmp(sj_get_string_value(sj_object_get_value(inst, "name")), "player_start")) {
+            int x, y;
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 0), &x);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 1), &y);
+            slog("Attempting to place player at %i, %i.", x, y);
+            char* dir = sj_get_string_value(sj_object_get_value(inst, "direction"));
+            if (!gfc_word_cmp(dir, "North"))
+                ((PlayerData*)(player_get()->data))->direction = North;
+            else if (!gfc_word_cmp(dir, "South"))
+                ((PlayerData*)(player_get()->data))->direction = South;
+            else if (!gfc_word_cmp(dir, "East"))
+                ((PlayerData*)(player_get()->data))->direction = East;
+            else if (!gfc_word_cmp(dir, "West"))
+                ((PlayerData*)(player_get()->data))->direction = West;
+            player_set_coords(vector2d(x, y));
+            slog("Placed Player");
+            //tile_set_occupier(level, x, y, boss);
+        }
+        if (!strcmp(sj_get_string_value(sj_object_get_value(inst, "name")), "portal")) {
+            int x, y, r, g, b;
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 0), &x);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 1), &y);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "color"), 0), &r);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "color"), 1), &g);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "color"), 2), &b);
+            Color col = gfc_color8(r, g, b, 255);
+            const char* t = sj_get_string_value(sj_object_get_value(inst, "targetMap"));
+            Entity* portal = owe_portal_new(t, vector2d(x, y), col);
+            slog("Placed Portal");
+            tile_set_occupier(level, x, y, portal);
+        }
+    }
+    SJson* rivals = sj_object_get_value(lj, "rivals");
+    if (rivals) {
+        SJson* quantities = sj_object_get_value(rivals, "quantities");
+        int quantity;
+        sj_get_integer_value(sj_array_get_nth(quantities, min(gfc_random() * sj_array_get_count(quantities), sj_array_get_count(quantities) - 1)), &quantity);
+        for (int i = 0; i < quantity; i++) {
+            slog("Getting rival coordinates...");
+            int x = min(gfc_random() * d, d - 1);
+            int y = min(gfc_random() * c, c - 1);
+            while (!tile_is_available(level, x, y) || !level->tileInfoMap[(y * (int)level->mapSize.x) + x].encounterZone) {
+                slog("Recalculating rival coordinates...");
+                x = min(gfc_random() * d, d - 1);
+                y = min(gfc_random() * c, c - 1);
+            }
+            slog("Getting rival difficulty...");
+            SJson* difficulties = sj_object_get_value(rivals, "difficulties");
+            int difficulty;
+            sj_get_integer_value(sj_array_get_nth(difficulties, min(gfc_random() * sj_array_get_count(difficulties), sj_array_get_count(difficulties) - 1)), &difficulty);
+            slog("Getting rival specialty...");
+            int r = min(gfc_random() * 5, 4);
+            TextWord specialty;
+            switch (r) {
+            case 0:
+            case 1:
+                gfc_word_cpy(specialty, "none");
+                break;
+            case 2:
+                gfc_word_cpy(specialty, "toughie");
+                break;
+            case 3:
+                gfc_word_cpy(specialty, "trickster");
+                break;
+            case 4:
+                gfc_word_cpy(specialty, "mage");
+                break;
+            }
+            slog("Rival specialty: %s.", specialty);
+            Entity* rival = owe_rival_new(specialty, difficulty, vector2d(x, y));
+            tile_set_occupier(level, x, y, rival);
+        }
+        slog("Successfully created %i rivals.", quantity);
     }
 
+    ((PlayerData*)(player_get()->data))->battleSteps = level->encounterSteps + gfc_crandom() * level->encounterVariance;
     sj_free(json);
     level_build(level);
     slog("Level created successfully.");
@@ -292,6 +367,12 @@ void tile_set_occupier(Level* level, int column, int row, Entity* occupier) {
 Entity* tile_get_occupier(Level* level, int column, int row) {
     int width = level->mapSize.x;
     return level->tileInfoMap[column + row * width].occupier;
+}
+int tile_is_available(Level* level, int column, int row) {
+    int width = level->mapSize.x;
+    if(level->tileInfoMap[column + row * width].occupier || level->tileInfoMap[column + row * width].solid)
+        return false;
+    return true;
 }
 
 void tile_cpy(TileInfo* dst, TileInfo* src) {

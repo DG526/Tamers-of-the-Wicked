@@ -40,6 +40,7 @@ Entity* entity_new() {
 		entityManager.entityList[i].inuse = 1;
 		entityManager.entityList[i].position = vector2d(0, 0);
 		entityManager.entityList[i].scale = vector2d(1, 1);
+		entityManager.entityList[i].color = gfc_color(1,1,1,1);
 		entityManager.entityList[i].frame = 0;
 		return &entityManager.entityList[i];
 	}
@@ -54,8 +55,9 @@ void entity_free(Entity* ent) {
 	if (ent->type == ET_Fiend) {
 		FiendData* data = (FiendData*)(ent->data);
 		gf2d_sprite_free(data->sprite);
-		memset(data, 0, sizeof(FiendData));
+		//memset(data, 0, sizeof(FiendData));
 	}
+	free(ent->data);
 	if (ent->sprite)
 		gf2d_sprite_free(ent->sprite);
 	memset(ent, 0, sizeof(Entity));
@@ -73,6 +75,12 @@ void entity_free_all() {
 
 	for (int i = 0; i < entityManager.entityMax; i++) {
 		if (!entityManager.entityList[i].inuse) continue;
+		entity_free(&(entityManager.entityList[i]));
+	}
+}
+void entity_free_interactibles() {
+	for (int i = 0; i < entityManager.entityMax; i++) {
+		if (!entityManager.entityList[i].inuse || entityManager.entityList[i].type != ET_Interactible) continue;
 		entity_free(&(entityManager.entityList[i]));
 	}
 }
@@ -95,17 +103,18 @@ void entity_draw(Entity* ent) {
 			NULL,
 			NULL,
 			NULL,
-			NULL,
+			&(ent->color),
 			ent->frame
 		);
 	}
 }
 
 void entity_draw_all() {
-
-	for (int i = 0; i < entityManager.entityMax; i++) {
-		if (!entityManager.entityList[i].inuse) continue;
-		entity_draw(&(entityManager.entityList[i]));
+	for (int l = 15; l > -15; l--) {
+		for (int i = 0; i < entityManager.entityMax; i++) {
+			if (!entityManager.entityList[i].inuse || entityManager.entityList[i].drawDepth != l) continue;
+			entity_draw(&(entityManager.entityList[i]));
+		}
 	}
 }
 
