@@ -57,7 +57,8 @@ void entity_free(Entity* ent) {
 		gf2d_sprite_free(data->sprite);
 		//memset(data, 0, sizeof(FiendData));
 	}
-	free(ent->data);
+	if(ent->data)
+		free(ent->data);
 	if (ent->sprite)
 		gf2d_sprite_free(ent->sprite);
 	memset(ent, 0, sizeof(Entity));
@@ -89,12 +90,13 @@ void entity_draw(Entity* ent) {
 	if (!ent) return;
 	if (ent->type == ET_Fiend) {
 		FiendData* data = (FiendData*)(ent->data);
-		if (data->HP == 0) return;
+		if (data->isDead) return;
 	}
 	if ((ent->type == ET_Player || ent->type == ET_Interactible) && (game_get_state() == GS_Battle || game_get_state() == GS_Naming || game_get_state() == GS_Title))
 		return;
 	Vector2D drawPos;
 	vector2d_add(drawPos, ent->position, camera_get_draw_offset());
+	vector2d_add(drawPos, drawPos, ent->drawOffset);
 	if (ent->sprite) {
 		gf2d_sprite_draw(
 			ent->sprite,

@@ -10,7 +10,7 @@ typedef enum {
 	ET_Player,
 	ET_Fiend,
 	ET_Interactible,
-	ET_NamingSystem
+	ET_Menu
 }EntityType;
 
 typedef enum {
@@ -33,6 +33,7 @@ typedef struct Entity_S
 	Vector2D scale;
 
 	int drawDepth;
+	Vector2D drawOffset;
 
 	Color color;
 

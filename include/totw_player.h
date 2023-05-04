@@ -12,7 +12,7 @@ typedef enum {
 
 typedef struct {
 	PlayerState state;
-	int money;
+	TextWord name;
 	Bool focused; //Whether the camera is focusing on the player
 	CompassDirection direction;
 	int battleSteps;

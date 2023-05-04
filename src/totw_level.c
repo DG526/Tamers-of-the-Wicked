@@ -160,6 +160,19 @@ Level* level_load(const char* filename)
             slog("Placed Portal");
             tile_set_occupier(level, x, y, portal);
         }
+        if (!strcmp(sj_get_string_value(sj_object_get_value(inst, "name")), "barn")) {
+            int x, y;
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 0), &x);
+            sj_get_integer_value(sj_array_get_nth(sj_object_get_value(inst, "tilePos"), 1), &y);
+            Entity* barn = owe_barn_new(vector2d(x, y));
+            slog("Placed Barnhemoth");
+            tile_set_occupier(level, x, y, barn);
+            for (int r = y - 3; r <= y; r++) {
+                for (int c = x - 2; c <= x + 2; c++) {
+                    tile_set_availability(level, c, r, false);
+                }
+            }
+        }
     }
     SJson* rivals = sj_object_get_value(lj, "rivals");
     if (rivals) {
@@ -373,6 +386,10 @@ int tile_is_available(Level* level, int column, int row) {
     if(level->tileInfoMap[column + row * width].occupier || level->tileInfoMap[column + row * width].solid)
         return false;
     return true;
+}
+void tile_set_availability(Level* level, int column, int row, Bool available) {
+    int width = level->mapSize.x;
+    level->tileInfoMap[column + row * width].solid = !available;
 }
 
 void tile_cpy(TileInfo* dst, TileInfo* src) {

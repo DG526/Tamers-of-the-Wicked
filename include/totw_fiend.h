@@ -63,6 +63,7 @@ typedef enum {
 }FiendType;
 
 typedef struct Fiend_S {
+	Bool inUse;
 	Entity* entity;
 	FiendType type;			//class
 	TextLine species;		//species name
@@ -74,18 +75,27 @@ typedef struct Fiend_S {
 	int level;				//1-50, increases with EXP
 	int exp;				//For allies, allows for levelling up. For enemies, shows how much given upon death.
 	int HP, MP;				//Current variable stat pool
+	Bool isDead;
+	Bool hasBossSound;
 	int stats[6];			//Base stats, use Stat enum to get/set particular stat.
 	int statSpellBonuses[6];	//Stat modifiers mid-combat, use Stat enum to get/set particular stat.
 	int statBreedBonuses[6];	//Stat modifiers post-fusion, use Stat enum to get/set particular stat.
 	int statsMin[6];		//Base stats at Lv. 1, use Stat enum to get/set particular stat.
 	int statsMax[6];		//Base stats at Lv. 50, use Stat enum to get/set particular stat.
 	Skill skills[10];		//List of skills learned.
+	Skill skillOverflow[11];
 	Skill potSkills[19];	//List of unlearned potential skills.
 	Skill selectedSkill;
 	Vector2D skillTarget;
 	Tactic tactic;			//Determines what moves AI chooses.
 	FiendStatus statuses[10];			//Status effects.
+	void (*plan)(struct Fiend_S* self); //Planning action.
+	void (*replan)(struct Fiend_S* self); //Planning action for mid-round. For support tactics and smart bosses only.
 }FiendData;
+
+void plan_destruction(FiendData* self);
+void plan_chaos(FiendData* self);
+void plan_support(FiendData* self);
 
 Bool fiend_has_status(FiendData* fiend, FiendStatusType status);
 void fiend_remove_status(FiendData* fiend, FiendStatusType status);
@@ -108,18 +118,17 @@ void party_load();
 void party_close();
 int party_get_member_count();
 int menagerie_get_member_count();
+int party_get_slots_used();
 Entity* party_read_member(int member);
 FiendData* party_read_member_data(int member);
 FiendData* menagerie_read_member_data_by_index(int index);
 SJson* menagerie_get_as_json();
 FiendData* read_fiend(const char* species);
 
-void dummy_think(Entity* self);
-
 void calculate_stats(FiendData* tgt);
 int calculate_stat(int minimum, int maximum, int level);
 
-int fiend_damage(FiendData* target, int raw);
+int fiend_damage(FiendData* target, int raw, Element element);
 float fiend_impress(FiendData* target, float raw);
 
 Bool fiend_name_taken(TextLine query);
@@ -128,8 +137,13 @@ void fiend_register_new(FiendData* newFiend);
 void fiend_part_ways(TextLine name);
 
 void party_add_fiend(FiendData* newFiend);
-void party_remove_fiend(TextLine name);
+void party_remove_fiend(int index);
+void party_replace_fiend(int index, FiendData* newFiend);
 
 int fiend_check_level_up(FiendData* self, TextBlock* textDisplay, int* step, Bool* leveledUp);
+int fiend_check_new_skills(FiendData* self);
+
+int fiend_change_tactic(Tactic tactic);
+int fiend_pick_skill(int skill);
 
 #endif

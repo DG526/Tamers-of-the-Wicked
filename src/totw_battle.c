@@ -4,10 +4,19 @@
 #include "totw_camera.h"
 #include "totw_battle.h"
 #include "totw_naming_screen.h"
+#include "totw_item.h"
 
 static Battle battle = { 0 };
 static TextBlock textPresets[64];
 
+void refresh_item_options();
+
+int battle_get_current_fiend() {
+	return battle.currentFiend;
+}
+void battle_next_fiend() {
+	battle.currentFiend++;
+}
 void battle_impress_enemy(float percent) {
 	battle.recruitChance += percent;
 	battle.recruiting = true;
@@ -46,9 +55,12 @@ FiendData* battle_get_party_member(int party, int member) {
 void battle_set_main_dialogue(TextBlock text) {
 	memcpy(((TextData*)(battle.gui.textDisplay.text->data))->text, *((TextBlock*)(text)), sizeof(TextBlock));
 }
+void battle_set_skill_dialogue(TextLine text) {
+	memcpy(((TextData*)(battle.gui.choice_command.dialogueText->data))->text, text, sizeof(TextBlock));
+}
 
 void battle_wait(int milliseconds) {
-	battle.timeForMove = SDL_GetTicks64() + milliseconds;
+	battle.timeForMove = SDL_GetTicks64() + milliseconds / game_get_wait_speed();
 }
 
 int in_battle() {
@@ -85,6 +97,7 @@ void kill_battle() {
 	else
 		game_set_state(GS_Roaming);
 	memset(&battle, 0, sizeof(Battle));
+	battle_sounds_free();
 }
 
 BStateFlag new_battle_flag(BStateType type, int duration) {
@@ -93,6 +106,7 @@ BStateFlag new_battle_flag(BStateType type, int duration) {
 }
 
 void switchPhase(BattlePhase phase) {
+	BattlePhase oldPhase = battle.phase;
 	battle.phase = phase;
 
 	battle.gui.textDisplay.dialogueFrame->visible = false;
@@ -104,6 +118,7 @@ void switchPhase(BattlePhase phase) {
 	battle.gui.choice_initial.opFight->visible = false;
 	battle.gui.choice_initial.opRecruit->visible = false;
 	battle.gui.choice_initial.opFlee->visible = false;
+	battle.gui.choice_initial.opItem->visible = false;
 
 	battle.gui.target_enemy.dialogueFrame->visible = false;
 	battle.gui.target_enemy.dialogueText->visible = false;
@@ -117,6 +132,34 @@ void switchPhase(BattlePhase phase) {
 		battle.gui.target_ally.options[i]->visible = false;
 	}
 
+	battle.gui.choice_tactic.dialogueFrame->visible = false;
+	battle.gui.choice_tactic.dialogueText->visible = false;
+	battle.gui.choice_tactic.optionFrame->visible = false;
+	battle.gui.choice_tactic.opChaos->visible = false;
+	battle.gui.choice_tactic.opDestruction->visible = false;
+	battle.gui.choice_tactic.opSupport->visible = false;
+	battle.gui.choice_tactic.opCommand->visible = false;
+	((OptionData*)(battle.gui.choice_tactic.opChaos->data))->selected = false;
+	((OptionData*)(battle.gui.choice_tactic.opDestruction->data))->selected = false;
+	((OptionData*)(battle.gui.choice_tactic.opSupport->data))->selected = false;
+	((OptionData*)(battle.gui.choice_tactic.opCommand->data))->selected = false;
+
+	battle.gui.choice_command.dialogueFrame->visible = false;
+	battle.gui.choice_command.dialogueText->visible = false;
+	battle.gui.choice_command.optionFrame->visible = false;
+	for (int i = 0; i < 10; i++) {
+		battle.gui.choice_command.opSkills[i]->visible = false;
+		((OptionData*)(battle.gui.choice_command.opSkills[i]->data))->selected = false;
+	}
+	for (int i = 0; i < 8; i++) {
+		battle.gui.choice_command.manaCosts[i]->visible = false;
+	}
+
+	battle.gui.choice_items.dialogueFrame->visible = false;
+	battle.gui.choice_items.optionFrame->visible = false;
+	battle.gui.choice_items.dialogueText->visible = false;
+	battle.gui.choice_items.options->visible = false;
+
 	switch (phase) {
 	case BP_RoundPrep:
 		battle.gui.choice_initial.dialogueFrame->visible = true;
@@ -125,12 +168,63 @@ void switchPhase(BattlePhase phase) {
 		battle.gui.choice_initial.opFight->visible = true;
 		battle.gui.choice_initial.opRecruit->visible = true;
 		battle.gui.choice_initial.opFlee->visible = true;
+		battle.gui.choice_initial.opItem->visible = true;
+		if (gfc_list_get_count(inventory_get_items()) == 0) {
+			((OptionData*)(battle.gui.choice_initial.opItem->data))->grayed = true;
+		}
 		break;
 	case BP_Acting:
+		battle.currentFiend = 1;
 	case BP_Ending:
 		battle.gui.textDisplay.dialogueFrame->visible = true;
 		battle.gui.textDisplay.text->visible = true;
 		((TextData*)(battle.gui.textDisplay.text))->scrolling = false;
+		break;
+	case BP_PreppingTactic:
+		battle.gui.choice_tactic.dialogueFrame->visible = true;
+		battle.gui.choice_tactic.dialogueText->visible = true;
+		TextBlock disp = "";
+		sprintf(disp, "How will %s act?", battle_get_party_member(1, battle_get_current_fiend())->name);
+		gfc_block_cpy(((TextData*)(battle.gui.choice_tactic.dialogueText->data))->text, disp);
+		battle.gui.choice_tactic.optionFrame->visible = true;
+		battle.gui.choice_tactic.opChaos->visible = true;
+		battle.gui.choice_tactic.opDestruction->visible = true;
+		//battle.gui.choice_tactic.opSupport->visible = true;
+		battle.gui.choice_tactic.opCommand->visible = true;
+
+		switch (battle_get_party_member(1, battle_get_current_fiend())->tactic) {
+		case Destruction:
+			((OptionData*)(battle.gui.choice_tactic.opDestruction->data))->selectedNow = true;
+			break;
+		case Chaos:
+			((OptionData*)(battle.gui.choice_tactic.opChaos->data))->selectedNow = true;
+			break;
+		case Support:
+			((OptionData*)(battle.gui.choice_tactic.opSupport->data))->selectedNow = true;
+			break;
+		}
+		break;
+	case BP_PreppingAction:
+		battle.gui.choice_command.dialogueFrame->visible = true;
+		battle.gui.choice_command.dialogueText->visible = true;
+		battle.gui.choice_command.optionFrame->visible = true;
+		for (int i = 0; i < 10; i++) {
+			if (battle_get_party_member(1, battle_get_current_fiend())->skills[i].inUse) {
+				battle.gui.choice_command.opSkills[i]->visible = true;
+				gfc_line_cpy(((OptionData*)(battle.gui.choice_command.opSkills[i]->data))->text, battle_get_party_member(1, battle_get_current_fiend())->skills[i].name);
+				((OptionData*)(battle.gui.choice_command.opSkills[i]->data))->hoverArg1 = battle_get_party_member(1, battle_get_current_fiend())->skills[i].description;
+			}
+		}
+		for (int i = 0; i < 8; i++) {
+			if (battle_get_party_member(1, battle_get_current_fiend())->skills[i + 2].inUse) {
+				battle.gui.choice_command.manaCosts[i]->visible = true;
+				TextBlock mc = "ALL";
+				if (gfc_line_cmp(battle_get_party_member(1, battle_get_current_fiend())->skills[i].name, "MartyrSurge"))
+					sprintf(mc, "%i", battle_get_party_member(1, battle_get_current_fiend())->skills[i+2].manaCost);
+				gfc_word_cpy(((TextData*)(battle.gui.choice_command.manaCosts[i]->data))->text, mc);
+			}
+		}
+		((OptionData*)(battle.gui.choice_command.opSkills[0]->data))->selectedNow = true;
 		break;
 	case BP_PreppingRecruit:
 		battle.gui.target_enemy.dialogueFrame->visible = true;
@@ -140,7 +234,7 @@ void switchPhase(BattlePhase phase) {
 		for (int i = 0; battle.gui.target_enemy.options[i]; i++) {
 			if (battle_get_party_member(2, i+1)->HP > 0) {
 				battle.gui.target_enemy.options[i]->visible = true;
-				((OptionData*)(battle.gui.target_enemy.options[i]->data))->choiceArgument = i + 1;
+				((OptionData*)(battle.gui.target_enemy.options[i]->data))->choiceArg1 = i + 1;
 				((OptionData*)(battle.gui.target_enemy.options[i]->data))->onChoose = startRound_recruit;
 				((OptionData*)(battle.gui.target_enemy.options[i]->data))->selected = false;
 				if (!first) {
@@ -178,7 +272,41 @@ void switchPhase(BattlePhase phase) {
 		}
 		gfc_input_update();
 		break;
+	case BP_PreppingItem:
+		battle.gui.choice_items.dialogueFrame->visible = true;
+		battle.gui.choice_items.optionFrame->visible = true;
+		battle.gui.choice_items.dialogueText->visible = true;
+		battle.gui.choice_items.options->visible = true;
+		gui_page_list_refresh_visibility(battle.gui.choice_items.options);
+		break;
 	}
+}
+int hover_item(int item) {
+	Item* itemRef = gfc_list_get_nth(inventory_get_items(), item);
+	gfc_block_cpy(((TextData*)(battle.gui.choice_items.dialogueText->data))->text, itemRef->description);
+	return 0;
+}
+int select_item(int item) {
+	battle.itemUsed = item;
+	switchPhase(BP_PreppingItemAim);
+	return 0;
+}
+void refresh_item_options() {
+	List* items = inventory_get_items();
+	List* ops = ((PageListData*)(battle.gui.choice_items.options->data))->options;
+	if (!items || !ops) return;
+	gfc_list_foreach(ops, gui_free);
+	gfc_list_clear(ops);
+	for (int i = 0; i < gfc_list_get_count(items); i++) {
+		Item* item = gfc_list_get_nth(items, i);
+		gfc_list_append(ops, gui_option_create(vector2d(0, 0), item->name, i == 0, 2));
+		GUI* lastOp = gfc_list_get_nth(ops, i);
+		((OptionData*)(lastOp->data))->grayed = !(item->useTime & 1);
+	}
+	gui_page_list_refresh(battle.gui.choice_items.options);
+}
+void battle_switch_phase(BattlePhase phase) {
+	switchPhase(phase);
 }
 int flee(void* unused) {
 	battle_set_main_dialogue("Run for your lives!");
@@ -236,8 +364,8 @@ int startRound_fight(void* unused) {
 	for (int i = 1; i <= 4; i++) {
 		FiendData* member = battle_get_party_member(1, i);
 		if (member && member->HP > 0) {
-			member->selectedSkill = get_skill("Attack");
-			member->skillTarget = vector2d(2, 0);
+			member->selectedSkill = get_skill(NULL);
+			//member->skillTarget = vector2d(2, 0);
 		}
 	}
 	battle.recruitAttempt++;
@@ -281,6 +409,7 @@ int startRound_recruit(void* target) {
 
 void load_battle_basics() {
 	slog("Starting to load battle basics.");
+	battle_sounds_init();
 	Vector2D renderSize = vector2d(300, 180);
 	TextBlock encounterList;
 	TextLine encounters[4];
@@ -320,19 +449,19 @@ void load_battle_basics() {
 	battle.gui.choice_initial.dialogueText = gui_text_create(vector2d(9, 81), "", false, 1);
 	battle.gui.choice_initial.opFight = gui_option_create(vector2d(9 + renderSize.x - 127, 81), "Fight", true, 1);
 	battle.gui.choice_initial.opRecruit = gui_option_create(vector2d(9 + renderSize.x - 127 + 118 / 2, 81), "Recruit", false, 1);
+	battle.gui.choice_initial.opItem = gui_option_create(vector2d(9 + renderSize.x - 127, 81 + 14), "Items", false, 1);
 	battle.gui.choice_initial.opFlee = gui_option_create(vector2d(9 + renderSize.x - 127 + 118 / 2, 81 + 14), "Flee", false, 1);
 	TextBlock d = "";
 
 	((OptionData*)(battle.gui.choice_initial.opFight->data))->left = battle.gui.choice_initial.opRecruit;
 	((OptionData*)(battle.gui.choice_initial.opFight->data))->right = battle.gui.choice_initial.opRecruit;
-	((OptionData*)(battle.gui.choice_initial.opFight->data))->up = battle.gui.choice_initial.opFlee;
-	((OptionData*)(battle.gui.choice_initial.opFight->data))->down = battle.gui.choice_initial.opFlee;
+	((OptionData*)(battle.gui.choice_initial.opFight->data))->up = battle.gui.choice_initial.opItem;
+	((OptionData*)(battle.gui.choice_initial.opFight->data))->down = battle.gui.choice_initial.opItem;
 	((OptionData*)(battle.gui.choice_initial.opFight->data))->onHover = changeDialogue;
 	memcpy(textPresets[1], "Fight:\n    Engage the enemy", sizeof(TextBlock));
-	((OptionData*)(battle.gui.choice_initial.opFight->data))->hoverArgument = &textPresets[1];
-	((OptionData*)(battle.gui.choice_initial.opFight->data))->onChoose = startRound_fight;
-	memcpy(textPresets[2], "Whoops, can't do that yet.", sizeof(TextBlock));
-	((OptionData*)(battle.gui.choice_initial.opFight->data))->choiceArgument = &textPresets[2];
+	((OptionData*)(battle.gui.choice_initial.opFight->data))->hoverArg1 = &textPresets[1];
+	((OptionData*)(battle.gui.choice_initial.opFight->data))->onChoose = switchPhase;
+	((OptionData*)(battle.gui.choice_initial.opFight->data))->choiceArg1 = BP_PreppingTactic;
 
 	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->left = battle.gui.choice_initial.opFight;
 	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->right = battle.gui.choice_initial.opFight;
@@ -340,19 +469,35 @@ void load_battle_basics() {
 	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->down = battle.gui.choice_initial.opFlee;
 	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->onHover = changeDialogue;
 	memcpy(textPresets[3], "Recruit:\n    Attempt to recruit\n    an enemy fiend", sizeof(TextBlock));
-	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->hoverArgument = &textPresets[3];
+	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->hoverArg1 = &textPresets[3];
 	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->onChoose = switchPhase;
-	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->choiceArgument = BP_PreppingRecruit;
+	((OptionData*)(battle.gui.choice_initial.opRecruit->data))->choiceArg1 = BP_PreppingRecruit;
 
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->left = battle.gui.choice_initial.opFlee;
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->right = battle.gui.choice_initial.opFlee;
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->up = battle.gui.choice_initial.opFight;
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->down = battle.gui.choice_initial.opFight;
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->onHover = changeDialogue;
+	memcpy(textPresets[3], "Item:\n    Use an Item.", sizeof(TextBlock));
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->hoverArg1 = &textPresets[3];
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->onChoose = switchPhase;
+	((OptionData*)(battle.gui.choice_initial.opItem->data))->choiceArg1 = BP_PreppingItem;
+	if (gfc_list_get_count(inventory_get_items()) == 0) {
+		((OptionData*)(battle.gui.choice_initial.opItem->data))->grayed = true;
+	}
+
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->left = battle.gui.choice_initial.opItem;
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->right = battle.gui.choice_initial.opItem;
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->up = battle.gui.choice_initial.opRecruit;
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->down = battle.gui.choice_initial.opRecruit;
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->onHover = changeDialogue;
 	memcpy(textPresets[5], "Flee:\n    Attempt to escape", sizeof(TextBlock));
-	((OptionData*)(battle.gui.choice_initial.opFlee->data))->hoverArgument = &textPresets[5];
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->hoverArg1 = &textPresets[5];
 	((OptionData*)(battle.gui.choice_initial.opFlee->data))->onChoose = flee;
 	memcpy(textPresets[6], "Whoops, can't do that yet.", sizeof(TextBlock));
-	((OptionData*)(battle.gui.choice_initial.opFlee->data))->choiceArgument = &textPresets[6];
+	((OptionData*)(battle.gui.choice_initial.opFlee->data))->choiceArg1 = &textPresets[6];
 
+	//Targeting GUI
 	battle.gui.target_enemy.dialogueFrame = gui_window_create(vector2d(4, 76 + 13), vector2d(renderSize.x - 8, renderSize.y / 2 - 8 - 28 - 13), 0);
 	battle.gui.target_enemy.dialogueText = gui_text_create(vector2d(9, 81 + 13), "Select target.", false, 1);
 	for (int i = 0; i < foes; i++) {
@@ -369,6 +514,77 @@ void load_battle_basics() {
 		((OptionData*)(battle.gui.target_ally.options[i]->data))->isPointingDown = true;
 	}
 
+	//Tactics GUI
+	battle.gui.choice_tactic.dialogueFrame = gui_window_create(vector2d(4, 76), vector2d(renderSize.x - 128, renderSize.y / 2 - 8 - 28), 0);
+	battle.gui.choice_tactic.dialogueText = gui_text_create(vector2d(9, 81), "", false, 1);
+	battle.gui.choice_tactic.optionFrame = gui_window_create(vector2d(4 + renderSize.x - 127, 76), vector2d(120, renderSize.y / 2 - 8 - 28), 0);
+	battle.gui.choice_tactic.opDestruction = gui_option_create(vector2d(9 + renderSize.x - 127, 81), "Destroy", false, 1);
+	battle.gui.choice_tactic.opChaos = gui_option_create(vector2d(9 + renderSize.x - 127 + 118 / 2, 81), "Chaos", false, 1);
+	battle.gui.choice_tactic.opSupport = gui_option_create(vector2d(9 + renderSize.x - 127, 81 + 14), "Support", false, 1);
+	battle.gui.choice_tactic.opCommand = gui_option_create(vector2d(9 + renderSize.x - 127 + 118 / 2, 81 + 14), "Order", false, 1);
+	battle.gui.choice_tactic.opCommand->color = gfc_color(0.5, 0, 1, 1);
+	OptionData* destruction = battle.gui.choice_tactic.opDestruction->data;
+	OptionData* chaos = battle.gui.choice_tactic.opChaos->data;
+	OptionData* support = battle.gui.choice_tactic.opSupport->data;
+	OptionData* comd = battle.gui.choice_tactic.opCommand->data;
+	destruction->left = battle.gui.choice_tactic.opChaos;
+	destruction->right = battle.gui.choice_tactic.opChaos;
+	destruction->down = battle.gui.choice_tactic.opSupport;
+	destruction->up = battle.gui.choice_tactic.opSupport;
+	destruction->onChoose = fiend_change_tactic;
+	destruction->choiceArg1 = Destruction;
+	
+	chaos->left = battle.gui.choice_tactic.opDestruction;
+	chaos->right = battle.gui.choice_tactic.opDestruction;
+	chaos->down = battle.gui.choice_tactic.opCommand;
+	chaos->up = battle.gui.choice_tactic.opCommand;
+	chaos->onChoose = fiend_change_tactic;
+	chaos->choiceArg1 = Chaos;
+	
+	support->left = battle.gui.choice_tactic.opCommand;
+	support->right = battle.gui.choice_tactic.opCommand;
+	support->down = battle.gui.choice_tactic.opDestruction;
+	support->up = battle.gui.choice_tactic.opDestruction;
+	support->onChoose = fiend_change_tactic;
+	support->choiceArg1 = Support;
+	
+	comd->left = battle.gui.choice_tactic.opSupport;
+	comd->right = battle.gui.choice_tactic.opSupport;
+	comd->down = battle.gui.choice_tactic.opChaos;
+	comd->up = battle.gui.choice_tactic.opChaos;
+	comd->onChoose = switchPhase;
+	comd->choiceArg1 = BP_PreppingAction;
+
+	//Skills GUI
+	int halfX = (renderSize.x - 8) / 2;
+	int unitY = (renderSize.y / 2 - 8) / 5;
+	battle.gui.choice_command.dialogueFrame = gui_window_create(vector2d(4, 76), vector2d(renderSize.x - 8, renderSize.y / 2 - 8 - 28), 0);
+	battle.gui.choice_command.optionFrame = gui_window_create(vector2d(4, 4), vector2d(renderSize.x - 8, renderSize.y / 2 - 8), 0);
+	battle.gui.choice_command.dialogueText = gui_text_create(vector2d(9, renderSize.y / 2 + 1), "", false, 1);
+	for (int i = 0; i < 10; i++) {
+		battle.gui.choice_command.opSkills[i] = gui_option_create(vector2d(9 + halfX * (i % 2), 9 + (int)(i / 2) * unitY), "Dummy", i == 0, 1);
+		if (i > 1) {
+			battle.gui.choice_command.manaCosts[i - 2] = gui_text_create(vector2d(9 + halfX * (i % 2 + 1) - 25, 9 + (int)(i / 2) * unitY), "0", false, 1);
+			battle.gui.choice_command.manaCosts[i - 2]->color = gfc_color(0, 0, 1, 1);
+		}
+	}
+	for (int i = 0; i < 10; i++) {
+		OptionData* dat = battle.gui.choice_command.opSkills[i]->data;
+		dat->onChoose = fiend_pick_skill;
+		dat->choiceArg1 = i;
+		dat->onHover = battle_set_skill_dialogue;
+		dat->left = (i % 2 == 0 ? battle.gui.choice_command.opSkills[i + 1] : battle.gui.choice_command.opSkills[i - 1]);
+		dat->right = (i % 2 == 0 ? battle.gui.choice_command.opSkills[i + 1] : battle.gui.choice_command.opSkills[i - 1]);
+		dat->up = (i < 2 ? battle.gui.choice_command.opSkills[i + 8] : battle.gui.choice_command.opSkills[i - 2]);
+		dat->down = (i >= 8 ? battle.gui.choice_command.opSkills[i - 8] : battle.gui.choice_command.opSkills[i + 2]);
+	}
+
+	//Item GUI
+	
+	battle.gui.choice_items.dialogueFrame = gui_window_create(vector2d(4, 76), vector2d(renderSize.x - 128, renderSize.y / 2 - 8 - 28), 0);
+	battle.gui.choice_items.optionFrame = gui_window_create(vector2d(4 + renderSize.x - 127, 76-14), vector2d(120, renderSize.y / 2 - 8 - 28+14), 0);
+	battle.gui.choice_items.dialogueText = gui_text_create(vector2d(9, 81), "", false, 1);
+	battle.gui.choice_items.options = gui_page_list_create(vector2d(4 + renderSize.x - 127, 76 - 14 + 8), max(gfc_list_get_count(inventory_get_items()), 1), 4, 120 - 17, 1);
 
 	//Player Ally GUI
 	for (int i = 0; i < party_get_member_count(); i++) {
@@ -398,6 +614,8 @@ void load_battle_basics() {
 	battle.recruitChance = 0;
 	battle.recruitTarget = 0;
 	battle.recruiting = false;
+	battle.currentFiend = 1;
+	battle.itemUsed = -1;
 }
 
 SJson* pluck(SJson* options, int* pointsLeft) {
@@ -495,6 +713,8 @@ void generate_new_battle(TextWord dungeon, int poolID) {
 		data->MP = data->stats[MMP];
 
 		data->entity = foe;
+
+		fiend_check_new_skills(data);
 
 		num++;
 	}
@@ -636,6 +856,8 @@ void generate_new_rival_battle(TextWord specialty, int difficulty) {
 
 		data->entity = foe;
 
+		fiend_check_new_skills(data);
+
 		num++;
 	}
 
@@ -702,6 +924,7 @@ void load_boss_battle(char* bossName) {
 		data->exp = exp;
 		data->level = level;
 		data->party = 2;
+		sj_get_integer_value(sj_object_get_value(particular, "boss sound"), &(data->hasBossSound));
 		gfc_line_cpy(data->species, sj_get_string_value(sj_object_get_value(particular, "species")));
 		gfc_line_cpy(data->name, sj_get_string_value(sj_object_get_value(particular, "name")));
 		slog("Copied boss name.");
@@ -720,6 +943,30 @@ void load_boss_battle(char* bossName) {
 		}
 		data->HP = data->stats[MHP];
 		data->MP = data->stats[MMP];
+
+		TextWord tactic;
+		gfc_word_cpy(tactic, sj_get_string_value(sj_object_get_value(particular, "tactic")));
+		if (!gfc_word_cmp(tactic, "destruction")) {
+			data->tactic = Destruction;
+			data->plan = plan_destruction;
+			slog("Plan set to destruction.");
+		}
+		if (!gfc_word_cmp(tactic, "chaos")) {
+			data->tactic = Chaos;
+			data->plan = plan_chaos;
+		}
+		if (!gfc_word_cmp(tactic, "support")) {
+			data->tactic = Support;
+		}
+		if (!gfc_word_cmp(tactic, "magicless")) {
+			data->tactic = Magicless;
+		}
+		SJson* skills = sj_object_get_value(particular, "skills");
+		if (skills && sj_is_array(skills)) {
+			for (int i = 0; i < sj_array_get_count(skills); i++) {
+				data->skills[i + 2] = get_skill(sj_get_string_value(sj_array_get_nth(skills, i)));
+			}
+		}
 
 		data->entity = foe;
 
@@ -818,15 +1065,45 @@ void battle_update() {
 		if (gfc_input_controller_button_pressed(0, "circle"))
 			switchPhase(BP_RoundPrep);
 		break;
+	case BP_PreppingTactic:
+		if (!battle_get_party_member(1, battle.currentFiend))
+			switchPhase(BP_PreAction);
+		if (gfc_input_controller_button_pressed(0, "circle")) {
+			if (battle.currentFiend > 1) {
+				battle.currentFiend--;
+				switchPhase(BP_PreppingTactic);
+			}
+			else
+				switchPhase(BP_RoundPrep);
+		}
+		break;
+	case BP_PreppingAction:
+		if (gfc_input_controller_button_pressed(0, "circle"))
+			switchPhase(BP_PreppingTactic);
+		break;
 	case BP_PreAction:
 	{
 		battle.recruiting = false;
 		int foe = 1, ally = 1, moveNum = 0;
 		for (int i = 0; i < 8; i++) {
-			if (!battle.battlers[i] || ((FiendData*)(battle.battlers[i]->data))->HP <= 0) continue;
+			if (!battle.battlers[i]) continue;
+			if(((FiendData*)(battle.battlers[i]->data))->HP <= 0) {
+				if (((FiendData*)(battle.battlers[i]->data))->party == 1)
+					ally++;
+				if (((FiendData*)(battle.battlers[i]->data))->party == 2)
+					foe++;
+				continue;
+			}
 			if (((FiendData*)(battle.battlers[i]->data))->party == 2) {
-				battle.moveOrder[moveNum] = get_skill("Attack");
-				battle.moveOrderUT[moveNum] = vector4d(2, foe, 1, 0);
+				if (((FiendData*)(battle.battlers[i]->data))->plan) {
+					((FiendData*)(battle.battlers[i]->data))->plan(battle.battlers[i]->data);
+					battle.moveOrder[moveNum] = ((FiendData*)(battle.battlers[i]->data))->selectedSkill;
+					battle.moveOrderUT[moveNum] = vector4d(2, foe, ((FiendData*)(battle.battlers[i]->data))->skillTarget.x, ((FiendData*)(battle.battlers[i]->data))->skillTarget.y);
+				}
+				else {
+					battle.moveOrder[moveNum] = get_skill("Attack");
+					battle.moveOrderUT[moveNum] = vector4d(2, foe, 1, 0);
+				}
 				battle.moveOrderDeterminer[moveNum] = ((FiendData*)(battle.battlers[i]->data))->stats[AGL] * (1 + gfc_crandom() * 0.16) + battle.moveOrder[moveNum].turnBoost;
 				slog("Foe %i chose a move on %f, %f", foe, battle.moveOrderUT[moveNum].z, battle.moveOrderUT[moveNum].w);
 				foe++;
@@ -836,10 +1113,19 @@ void battle_update() {
 					battle.moveOrder[moveNum] = ((FiendData*)(battle.battlers[i]->data))->selectedSkill;
 					battle.moveOrderUT[moveNum] = vector4d(1, ally, ((FiendData*)(battle.battlers[i]->data))->skillTarget.x, ((FiendData*)(battle.battlers[i]->data))->skillTarget.y);
 				}
+				else if (((FiendData*)(battle.battlers[i]->data))->plan) {
+					((FiendData*)(battle.battlers[i]->data))->plan(battle.battlers[i]->data);
+					battle.moveOrder[moveNum] = ((FiendData*)(battle.battlers[i]->data))->selectedSkill;
+					battle.moveOrderUT[moveNum] = vector4d(1, ally, ((FiendData*)(battle.battlers[i]->data))->skillTarget.x, ((FiendData*)(battle.battlers[i]->data))->skillTarget.y);
+				}
 				else {
 					battle.moveOrder[moveNum] = get_skill("Attack");
 					battle.moveOrderUT[moveNum] = vector4d(1, ally, 2, 0);
 				}
+				/*if (((FiendData*)(battle.battlers[i]->data)) == battle_get_party_member(1,1)) {
+					battle.moveOrder[moveNum] = get_skill("umbraboom");
+					battle.moveOrderUT[moveNum] = vector4d(1, ally, 2, 0);
+				}*/
 				battle.moveOrderDeterminer[moveNum] = ((FiendData*)(battle.battlers[i]->data))->stats[AGL] * (1 + gfc_crandom() * 0.16) + battle.moveOrder[moveNum].turnBoost;
 				slog("Ally %i chose a move on %f, %f", ally, battle.moveOrderUT[moveNum].z, battle.moveOrderUT[moveNum].w);
 				ally++;
@@ -869,7 +1155,8 @@ void battle_update() {
 		}
 		slog("Move order:");
 		for (int i = 0; i < moveNum; i++) {
-			slog("   %i: %s %s on %i-%i", i, battle_get_party_member(battle.moveOrderUT[i].x,battle.moveOrderUT[i].y)->name, battle.moveOrder[i].name,
+			if(battle.moveOrder[i].inUse && battle_get_party_member(battle.moveOrderUT[i].x, battle.moveOrderUT[i].y))
+				slog("   %i: %s %s on %i-%i", i, battle_get_party_member(battle.moveOrderUT[i].x,battle.moveOrderUT[i].y)->name, battle.moveOrder[i].name,
 				(int)(battle.moveOrderUT[i].z), (int)(battle.moveOrderUT[i].w));
 		}
 		battle.turn = 0;
@@ -905,7 +1192,7 @@ void battle_update() {
 					battle.turn++;
 					battle_handle_outcome();
 				}
-				if (!(battle.turn >= 8 || !battle.battlers[battle.turn])) {
+				if (!(battle.turn < 8 && battle.battlers[battle.turn])) {
 					battle_wait(1000);
 				}
 			}
@@ -915,9 +1202,9 @@ void battle_update() {
 	case BP_PostAction:
 		for (int i = 0; i < 8; i++) {
 			if (battle.battlers[i]) {
-				((FiendData*)(battle.battlers[i]->data))->selectedSkill.chosen = false;
+				((FiendData*)(battle.battlers[i]->data))->selectedSkill = get_skill(NULL);
 			}
-			battle.moveOrder[i].chosen = false;
+			battle.moveOrder[i] = get_skill(NULL);
 			battle.moveOrderDeterminer[i] = 0;
 			battle.moveOrderUT[i] = vector4d(0, 0, 0, 0);
 		}

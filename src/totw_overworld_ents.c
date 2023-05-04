@@ -2,6 +2,7 @@
 
 #include "totw_game_status.h"
 #include "totw_battle.h"
+#include "totw_fiend_management.h"
 #include "totw_player.h"
 #include "totw_level.h"
 
@@ -177,4 +178,21 @@ void owe_rival_interact(Entity* self) {
 	data->dialogueBox->visible = true;
 	data->dialogueText = gui_text_create(vector2d(9, game_get_resolution_y() - (game_get_resolution_y() / 2 - 8 - 28) + 5), data->dialogue[0], 1, 1);
 	data->dialogueText->visible = true;
+}
+
+Entity* owe_barn_new(Vector2D worldCoords) {
+	Entity* barn = entity_new();
+	if (!barn) return NULL;
+	barn->sprite = gf2d_sprite_load_all("images/Barnhemoth.png", 160, 192, 1, 0);
+	barn->interact = owe_barn_interact;
+	barn->type = ET_Interactible;
+	vector2d_copy(barn->mapPosition, worldCoords);
+	barn->position = vector2d_multiply(worldCoords, vector2d(32, 32));
+	barn->solid = true;
+	barn->drawOffset = vector2d(-32 * 2, -32 * 5);
+	barn->drawDepth = -1;
+	return barn;
+}
+void owe_barn_interact(Entity* self) {
+	party_manager_new();
 }

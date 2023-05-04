@@ -9,7 +9,11 @@ typedef enum {
 	BP_Opening,
 	BP_RoundPrep,
 	BP_PreppingItem,
+	BP_PreppingItemAim,
+	BP_UsingItem,
+	BP_PreppingTactic,
 	BP_PreppingAction,
+	BP_PreppingActionAim,
 	BP_PreppingRecruit,
 	BP_PreAction,
 	BP_Acting,
@@ -39,6 +43,7 @@ typedef struct {
 typedef enum {
 	BM_FullDialogue,
 	BM_Choice_Initial,
+	BM_Choice_Tactic,
 	BM_Choice_Command,
 	BM_Choice_Skill,
 	BM_Choice_Item
@@ -60,6 +65,28 @@ typedef struct {
 typedef struct {
 	GUI* dialogueFrame;
 	GUI* dialogueText;
+	GUI* optionFrame;
+	GUI* opDestruction;
+	GUI* opChaos;
+	GUI* opSupport;
+	GUI* opCommand;
+}BattleMenu_Ch_Tactic;
+typedef struct {
+	GUI* dialogueFrame;
+	GUI* dialogueText;
+	GUI* optionFrame;
+	GUI* opSkills[10];
+	GUI* manaCosts[8];
+}BattleMenu_Ch_Command;
+typedef struct {
+	GUI* dialogueFrame; //Window
+	GUI* dialogueText; //Text
+	GUI* optionFrame; //Window
+	GUI* options; //PageList
+}BattleMenu_Ch_Items;
+typedef struct {
+	GUI* dialogueFrame;
+	GUI* dialogueText;
 	GUI* options[4];
 }BattleMenu_Targeting;
 typedef struct {
@@ -68,6 +95,9 @@ typedef struct {
 	BattleMenu_TextDisplay textDisplay;
 	BattleMenu_Ch_Initial choice_initial;
 	BattleMenu_Targeting target_ally, target_enemy;
+	BattleMenu_Ch_Tactic choice_tactic;
+	BattleMenu_Ch_Command choice_command;
+	BattleMenu_Ch_Items choice_items;
 }BattleGUIHolder;
 
 typedef struct Battle_S {
@@ -94,6 +124,8 @@ typedef struct Battle_S {
 	float recruitChance;
 	int recruitAttempt;
 
+	int itemUsed;
+
 	Bool victorious;
 }Battle;
 void kill_battle();
@@ -104,6 +136,7 @@ void generate_new_rival_battle(TextWord specialty, int difficulty);
 void load_boss_battle(char* bossName);
 
 void battle_update();
+void battle_switch_phase(BattlePhase phase);
 
 FiendData* battle_get_party_member(int party, int member);
 void battle_set_main_dialogue(TextBlock text);
@@ -114,5 +147,8 @@ void battle_impress_enemy(float percent);
 float battle_get_recruit_chance();
 
 void battle_add_exp(int exp);
+
+int battle_get_current_fiend();
+void battle_next_fiend();
 
 #endif

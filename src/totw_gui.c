@@ -76,6 +76,7 @@ GUI* gui_option_create(Vector2D position, TextLine text, Bool isDefault, int lay
 	if (!data) return NULL;
 	Sprite* cursor = gf2d_sprite_load_all("images/selection_cursor.png", 8, 7, 2, 0);
 	memcpy(data->text, text, sizeof(TextLine));
+	data->isCurrentlyActive = true;
 	data->selectedNow = isDefault;
 	for (int i = 0; i < guiManager.entityMax; i++) {
 		if (guiManager.entityList[i].inuse) continue;
@@ -189,6 +190,10 @@ void gui_free(GUI* self) {
 		memset(self->data, 0, sizeof(SubmenuData));
 		break;
 		}
+	case PageList:
+		gfc_list_foreach(((PageListData*)(self->data))->options, gui_free);
+		memset(self->data, 0, sizeof(PageListData));
+		break;
 	}
 	memset(self, 0, sizeof(GUI));
 }
@@ -498,6 +503,47 @@ void gui_draw(GUI* self) {
 			gf2d_font_draw_line_tag(((OptionData*)(self->data))->text, FT_Normal, ((OptionData*)(self->data))->grayed ? gfc_color(0.5, 0.5, 0.5, 1) : self->color, vector2d(self->position.x + 10, self->position.y));;
 		}
 		break;
+	case PageList:
+		if (self->sprite) {
+			Vector2D flip = vector2d(-1, 1);
+			if (((PageListData*)(self->data))->currentPage > 0)
+				gf2d_sprite_draw(
+					self->sprite,
+					vector2d(self->position.x - 6, self->position.y + ((PageListData*)(self->data))->arrowYOffset),
+					&flip,
+					NULL,
+					NULL,
+					NULL,
+					NULL,
+					0
+				);
+			if (((PageListData*)(self->data))->currentPage < ((PageListData*)(self->data))->pageCount - 1)
+				gf2d_sprite_draw(
+					self->sprite,
+					vector2d(self->position.x + ((PageListData*)(self->data))->rightArrowRelPos, self->position.y + ((PageListData*)(self->data))->arrowYOffset),
+					NULL,
+					NULL,
+					NULL,
+					NULL,
+					NULL,
+					0
+				);
+		}
+		break;
+	case SpriteGUI:
+		if (self->sprite) {
+			gf2d_sprite_draw(
+				self->sprite,
+				vector2d(self->position.x, self->position.y),
+				NULL,
+				NULL,
+				NULL,
+				NULL,
+				NULL,
+				0
+			);
+		}
+		break;
 	}
 }
 void gui_draw_all() {
@@ -520,58 +566,94 @@ void gui_update(GUI* self) {
 			((TextData*)(self->data))->currentChar += 0.4;
 	}
 	if (self->type == Option) {
-		if (((OptionData*)(self->data))->selected && self->visible) {
+		if (((OptionData*)(self->data))->selected && self->visible && ((OptionData*)(self->data))->isCurrentlyActive) {
 			if (gfc_input_controller_button_pressed_by_index(0, 0)) {
 				slog("Selected an option.");
 				if(((OptionData*)(self->data))->onChoose && !((OptionData*)(self->data))->grayed)
-					((OptionData*)(self->data))->onChoose(((OptionData*)(self->data))->choiceArgument);
+					((OptionData*)(self->data))->onChoose(((OptionData*)(self->data))->choiceArg1, ((OptionData*)(self->data))->choiceArg2, ((OptionData*)(self->data))->choiceArg3);
 				if (!self->inuse) return;
 			}
 			else {
+				GUI* target = self;
 				if (((OptionData*)(self->data))->down && gfc_input_controller_button_pressed(0, "D_D")) {
-					if (((OptionData*)(self->data))->down->type == Option) {
-						((OptionData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
-						((OptionData*)(self->data))->selected = false;
-					}
-					else if (((OptionData*)(self->data))->down->type == Letter) {
-						((LetterData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
-						((OptionData*)(self->data))->selected = false;
-					}
+					do {
+						if(target->type == Option)
+							target = ((OptionData*)(target->data))->down;
+						if(target->type == Letter)
+							target = ((LetterData*)(target->data))->down;
+						/*if (((OptionData*)(self->data))->down->type == Option) {
+							((OptionData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
+							((OptionData*)(self->data))->selected = false;
+						}
+						else if (((OptionData*)(self->data))->down->type == Letter) {
+							((LetterData*)(((OptionData*)(self->data))->down->data))->selectedNow = true;
+							((OptionData*)(self->data))->selected = false;
+						}*/
+					} while (!target->visible);
+					
 				}
 				else if (((OptionData*)(self->data))->up && gfc_input_controller_button_pressed(0, "D_U")) {
-					if (((OptionData*)(self->data))->up->type == Option) {
+					do {
+						if (target->type == Option)
+							target = ((OptionData*)(target->data))->up;
+						if (target->type == Letter)
+							target = ((LetterData*)(target->data))->up;
+						/*if (((OptionData*)(self->data))->up->type == Option) {
 						((OptionData*)(((OptionData*)(self->data))->up->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
 					}
 					else if (((OptionData*)(self->data))->up->type == Letter) {
 						((LetterData*)(((OptionData*)(self->data))->up->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
-					}
+					}*/
+					} while (!target->visible);
 				}
 				else if (((OptionData*)(self->data))->left && gfc_input_controller_button_pressed(0, "D_L")) {
-					if (((OptionData*)(self->data))->left->type == Option) {
+					do {
+						if (target->type == Option)
+							target = ((OptionData*)(target->data))->left;
+						if (target->type == Letter)
+							target = ((LetterData*)(target->data))->left;
+						/*if (((OptionData*)(self->data))->left->type == Option) {
 						((OptionData*)(((OptionData*)(self->data))->left->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
 					}
 					else if (((OptionData*)(self->data))->left->type == Letter) {
 						((LetterData*)(((OptionData*)(self->data))->left->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
-					}
+					}*/
+					} while (!target->visible);
 				}
 				else if (((OptionData*)(self->data))->right && gfc_input_controller_button_pressed(0, "D_R")) {
-					if (((OptionData*)(self->data))->right->type == Option) {
+					do {
+						if (target->type == Option)
+							target = ((OptionData*)(target->data))->right;
+						if (target->type == Letter)
+							target = ((LetterData*)(target->data))->right;
+						/*if (((OptionData*)(self->data))->right->type == Option) {
 						((OptionData*)(((OptionData*)(self->data))->right->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
 					}
 					else if (((OptionData*)(self->data))->right->type == Letter) {
 						((LetterData*)(((OptionData*)(self->data))->right->data))->selectedNow = true;
 						((OptionData*)(self->data))->selected = false;
+					}*/
+					} while (!target->visible);
+				}
+				if (target != self) {
+					if (target->type == Option) {
+						((OptionData*)(target->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
+					}
+					else if (target->type == Letter) {
+						((LetterData*)(target->data))->selectedNow = true;
+						((OptionData*)(self->data))->selected = false;
 					}
 				}
 			}
 		}
 		if (((OptionData*)(self->data))->selectedNow && self->visible) {
-			if (((OptionData*)(self->data))->onHover) ((OptionData*)(self->data))->onHover(((OptionData*)(self->data))->hoverArgument);
+			if (((OptionData*)(self->data))->onHover) ((OptionData*)(self->data))->onHover(((OptionData*)(self->data))->hoverArg1, ((OptionData*)(self->data))->hoverArg2, ((OptionData*)(self->data))->hoverArg3);
 			((OptionData*)(self->data))->selectedNow = false;
 			((OptionData*)(self->data))->selected = true;
 		}
@@ -644,6 +726,33 @@ void gui_update(GUI* self) {
 			((LetterData*)(self->data))->selected = true;
 		}
 	}
+	if (self->type == PageList) {
+		PageListData* data = self->data;
+		if (data->isCurrentlyActive) {
+			if (((OptionData*)(self->data))->down && gfc_input_controller_button_pressed(0, "D_D")) {
+				data->selectedItemIndex++;
+				if (data->selectedItemIndex >= data->currentPage * data->maxLinesPerPage + data->maxLinesPerPage || data->selectedItemIndex >= data->items)
+					data->selectedItemIndex = data->currentPage * data->maxLinesPerPage;
+			}
+			else if (((OptionData*)(self->data))->up && gfc_input_controller_button_pressed(0, "D_U")) {
+				data->selectedItemIndex--;
+				if (data->selectedItemIndex < data->currentPage * data->maxLinesPerPage)
+					data->selectedItemIndex = min(data->selectedItemIndex + data->maxLinesPerPage, data->items - 1);
+			}
+			else if (((OptionData*)(self->data))->left && gfc_input_controller_button_pressed(0, "D_L")) {
+				if (data->currentPage > 0) {
+					data->currentPage--;
+					data->selectedItemIndex -= data->maxLinesPerPage;
+				}
+			}
+			else if (((OptionData*)(self->data))->right && gfc_input_controller_button_pressed(0, "D_R")) {
+				if (data->currentPage < data->pageCount - 1) {
+					data->currentPage++;
+					data->selectedItemIndex = min(data->selectedItemIndex + data->maxLinesPerPage, data->items - 1);
+				}
+			}
+		}
+	}
 	if (self->update) self->update(self);
 }
 void gui_update_all() {
@@ -682,8 +791,122 @@ GUI* gui_error_create(TextLine message, int layer, GUI* returnTo) {
 		guiManager.entityList[i].inuse = 1;
 		guiManager.entityList[i].type = Container;
 		guiManager.entityList[i].data = data;
-		guiManager.entityList[i].layer = 0;
+		guiManager.entityList[i].layer = layer;
 		guiManager.entityList[i].update = window_close_on_cross;
 		return &guiManager.entityList[i];
 	}
+	return NULL;
+}
+GUI* gui_page_list_create(Vector2D position, int itemCount, int maxPerPage, float rightArrowXPos, int layer) {
+	PageListData* data = gfc_allocate_array(sizeof(PageListData), 1);
+	data->maxLinesPerPage = maxPerPage;
+	data->rightArrowRelPos = rightArrowXPos;
+	data->currentPage = 0;
+	data->selectedItemIndex = 0;
+	data->options = gfc_list_new_size(itemCount);
+	if (!data->options) {
+		slog("Something went wrong when initializing list.");
+	}
+	data->arrowYOffset = (maxPerPage * 14 - 11) / 2;
+
+	for (int i = 0; i < guiManager.entityMax; i++) {
+		if (guiManager.entityList[i].inuse) continue;
+		guiManager.entityList[i].inuse = 1;
+		guiManager.entityList[i].type = PageList;
+		guiManager.entityList[i].position = position;
+		guiManager.entityList[i].data = data;
+		guiManager.entityList[i].layer = layer;
+		guiManager.entityList[i].sprite = gf2d_sprite_load_all("images/Arrow.png",7,11,1,0);
+		slog("Page list creation successful.");
+		return &guiManager.entityList[i];
+	}
+	return NULL;
+}
+void gui_page_list_refresh(GUI* pageList) {
+	if (!pageList) return;
+	PageListData* data = pageList->data;
+	//List* options = data->options;
+	if (!data->options) { slog("Something went wrong with the list."); return; }
+	data->items = gfc_list_get_count(data->options);
+	data->pageCount = ceil((float)data->items / data->maxLinesPerPage);
+	data->currentPage = 0;
+	int item = 0;
+	slog("Pagelist contains %i items across %i pages.", data->items, data->pageCount);
+	for (int i = 0; i < data->pageCount && item < data->items; i++) {
+		for (int j = 0; j < data->maxLinesPerPage && item < data->items; j++) {
+			slog("Handling item %i/%i, line %i/%i on page %i/%i.", item + 1, data->items, j + 1, data->maxLinesPerPage, i + 1, data->pageCount);
+
+			GUI* current = gfc_list_get_nth(data->options, item), * prev = NULL, * next = NULL;
+
+			if (!current) { slog("Whoops, no gui selected!"); continue; }
+
+			current->position = vector2d(pageList->position.x, pageList->position.y + j * 14);
+
+			if (item == data->items - 1) {
+				if (j > 0) {
+					prev = gfc_list_get_nth(data->options, item - 1);
+					next = gfc_list_get_nth(data->options, item - j);
+				}
+			}
+			else if (j == 0) {
+				prev = gfc_list_get_nth(data->options, item + data->maxLinesPerPage - 2);
+				next = gfc_list_get_nth(data->options, item + 1);
+			}
+			else if (j == data->maxLinesPerPage - 1) {
+				prev = gfc_list_get_nth(data->options, item - 1);
+				next = gfc_list_get_nth(data->options, item - j);
+			}
+			else {
+				prev = gfc_list_get_nth(data->options, item - 1);
+				next = gfc_list_get_nth(data->options, item + 1);
+			}
+			((OptionData*)(current->data))->up = prev;
+			((OptionData*)(current->data))->down = next;
+			current->layer = pageList->layer;
+			if(i == data->currentPage)
+			{
+				current->visible = pageList->visible;
+				slog("Made option %i visible.", item);
+			}
+			item++;
+		}
+	}
+	slog("Refreshed page list.");
+}
+void gui_page_list_refresh_visibility(GUI* pageList) {
+	if (!pageList) return;
+	PageListData* data = pageList->data;
+	List* options = data->options;
+	if (!data->options) slog("Something went wrong with the list.");
+	int item = 0;
+	for (int i = 0; i < data->pageCount && item < data->items; i++) {
+		for (int j = 0; j < data->maxLinesPerPage && item < data->items; j++) {
+			slog("Handling visibility on item %i/%i, line %i/%i on page %i/%i.", item + 1, data->items, j + 1, data->maxLinesPerPage, i + 1, data->pageCount);
+			GUI* current = gfc_list_get_nth(data->options, item);
+
+			if (!current) { slog("Whoops, no gui selected!"); continue; }
+			if (i == data->currentPage)
+			{
+				current->visible = pageList->visible;
+				slog("Made option %i visible.", item);
+			}
+			else {
+				current->visible = false;
+			}
+			item++;
+		}
+	}
+}
+GUI* gui_sprite_create(Vector2D position, Sprite* sprite, Color color, int layer) {
+	for (int i = 0; i < guiManager.entityMax; i++) {
+		if (guiManager.entityList[i].inuse) continue;
+		guiManager.entityList[i].inuse = 1;
+		guiManager.entityList[i].type = SpriteGUI;
+		guiManager.entityList[i].position = position;
+		guiManager.entityList[i].layer = layer;
+		guiManager.entityList[i].sprite = sprite;
+		guiManager.entityList[i].color = color;
+		return &guiManager.entityList[i];
+	}
+	return NULL;
 }

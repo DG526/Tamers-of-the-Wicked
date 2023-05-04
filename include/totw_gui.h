@@ -13,9 +13,11 @@ typedef enum {
 	Text,
 	Option,
 	Letter,
+	PageList,
 	Meter,
 	ButtonHint,
-	Container
+	Container,
+	SpriteGUI
 }GUIType;
 
 typedef struct GUI_S {
@@ -43,14 +45,27 @@ typedef struct {
 	TextLine text;
 	GUI* left, * right, * up, * down;
 	Bool isPointingUp, isPointingDown;
+	Bool isCurrentlyActive;
 	Bool grayed;
 	Bool selectedNow;
 	Bool selected;
-	void* hoverArgument; //Argument passed to onHover()
-	void* choiceArgument; //Argument passed to onChoose()
-	int (*onHover)(void* arg);
-	int (*onChoose)(void* arg);
+	void* hoverArg1; //Argument passed to onHover()
+	void* hoverArg2, * hoverArg3;
+	void* choiceArg1; //Argument passed to onChoose()
+	void* choiceArg2, * choiceArg3;
+	//int hoverArgs, choiceArgs;
+	int (*onHover)(void*, ...);
+	int (*onChoose)(void* arg, ...);
 }OptionData;
+typedef struct {
+	Bool isCurrentlyActive;
+	int maxLinesPerPage, currentPage, pageCount;
+	int items;
+	int selectedItemIndex;
+	List* options;
+	float rightArrowRelPos;
+	float arrowYOffset;
+}PageListData;
 typedef struct {
 	TextBlock text;
 	GUI* left, * right, * up, * down;
@@ -70,6 +85,7 @@ typedef struct {
 	int icon;
 }ButtonHintData;
 
+
 void gui_manager_init(Uint32 max);
 
 GUI* gui_window_create(Vector2D position, Vector2D size, int layer);
@@ -77,6 +93,10 @@ GUI* gui_text_create(Vector2D position, TextBlock text, Bool scrolling, int laye
 GUI* gui_option_create(Vector2D position, TextLine text, Bool isDefault, int layer);
 GUI* gui_letter_create(Vector2D position, char letter, char shiftLetter, Bool isDefault, TextLine* appendTo, int layer);
 GUI* gui_meter_create(Vector2D position, Vector2D size, Color color, int layer);
+GUI* gui_sprite_create(Vector2D position, Sprite* sprite, Color color, int layer);
+GUI* gui_page_list_create(Vector2D position, int itemCount, int maxPerPage, float rightArrowXPos, int layer);
+void gui_page_list_refresh(GUI* pageList);
+void gui_page_list_refresh_visibility(GUI* pageList);
 /**
 *@param position: where to put the hint
 *@param text: what the hint is for

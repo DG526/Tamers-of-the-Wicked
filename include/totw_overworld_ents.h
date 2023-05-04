@@ -46,4 +46,7 @@ void owe_rival_think(Entity* self);
 void owe_rival_update(Entity* self);
 void owe_rival_interact(Entity* self);
 
+Entity* owe_barn_new(Vector2D worldCoords);
+void owe_barn_interact(Entity* self);
+
 #endif

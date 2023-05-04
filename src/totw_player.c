@@ -27,6 +27,7 @@ Entity* player_new() {
 	data->focused = true;
 	data->state = PS_Idle;
 	data->battleSteps = -1;
+	gfc_word_cpy(data->name, "DummyBoy");
 	player->data = data;
 	return player;
 }

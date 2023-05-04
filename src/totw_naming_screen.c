@@ -43,7 +43,7 @@ Entity* naming_system_new(FiendData* namingTarget) {
 	slog("creating option");
 	data->choices[38] = gui_option_create(vector2d(xOffsetBase + xOffsetInterval * 8, yOffsetBase + yOffsetInterval * 3), "Enter", false, 0);
 	data->choices[38]->visible = true;
-	((OptionData*)(data->choices[38]->data))->choiceArgument = sys;
+	((OptionData*)(data->choices[38]->data))->choiceArg1 = sys;
 	((OptionData*)(data->choices[38]->data))->onChoose = name_fiend;
 	charNum = 0;
 	for (int r = 0; charNum < 38; r++) {
@@ -74,6 +74,7 @@ Entity* naming_system_new(FiendData* namingTarget) {
 
 	sys->data = data;
 	sys->think = naming_system_think;
+	sys->type = ET_Menu;
 	return sys;
 }
 
@@ -154,7 +155,8 @@ int name_fiend(void* namingSystem) {
 	}
 	else {
 		fiend_register_new((FiendData*)(data->namingTarget));
-		party_add_fiend((FiendData*)(data->namingTarget));
+		if(party_get_slots_used() + ((FiendData*)(data->namingTarget))->size <= 4)
+			party_add_fiend((FiendData*)(data->namingTarget));
 		naming_system_free((Entity*)(namingSystem));
 		slog("Fiend named successfully.");
 	}

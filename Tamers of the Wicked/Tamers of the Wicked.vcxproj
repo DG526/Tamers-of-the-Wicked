@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -164,10 +164,20 @@
     <ClInclude Include="..\include\gf2d_font.h" />
     <ClInclude Include="..\include\gf2d_graphics.h" />
     <ClInclude Include="..\include\gf2d_sprite.h" />
+    <ClInclude Include="..\include\totw_battle.h" />
+    <ClInclude Include="..\include\totw_bgm.h" />
+    <ClInclude Include="..\include\totw_camera.h" />
     <ClInclude Include="..\include\totw_entity.h" />
     <ClInclude Include="..\include\totw_fiend.h" />
+    <ClInclude Include="..\include\totw_fiend_management.h" />
+    <ClInclude Include="..\include\totw_game_status.h" />
     <ClInclude Include="..\include\totw_gui.h" />
-    <ClInclude Include="gf2d_camera.h" />
+    <ClInclude Include="..\include\totw_item.h" />
+    <ClInclude Include="..\include\totw_level.h" />
+    <ClInclude Include="..\include\totw_naming_screen.h" />
+    <ClInclude Include="..\include\totw_overworld_ents.h" />
+    <ClInclude Include="..\include\totw_player.h" />
+    <ClInclude Include="..\include\totw_skill.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\gfc\simple_json\src\simple_json.c" />
@@ -195,9 +205,20 @@
     <ClCompile Include="..\src\gf2d_font.c" />
     <ClCompile Include="..\src\gf2d_graphics.c" />
     <ClCompile Include="..\src\gf2d_sprite.c" />
+    <ClCompile Include="..\src\totw_battle.c" />
+    <ClCompile Include="..\src\totw_bgm.c" />
+    <ClCompile Include="..\src\totw_camera.c" />
     <ClCompile Include="..\src\totw_entity.c" />
     <ClCompile Include="..\src\totw_fiend.c" />
+    <ClCompile Include="..\src\totw_fiend_management.c" />
+    <ClCompile Include="..\src\totw_game_status.c" />
     <ClCompile Include="..\src\totw_gui.c" />
+    <ClCompile Include="..\src\totw_item.c" />
+    <ClCompile Include="..\src\totw_level.c" />
+    <ClCompile Include="..\src\totw_naming_screen.c" />
+    <ClCompile Include="..\src\totw_overworld_ents.c" />
+    <ClCompile Include="..\src\totw_player.c" />
+    <ClCompile Include="..\src\totw_skill.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

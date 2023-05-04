@@ -11,11 +11,11 @@ void bgm_play_loop(BGMTrack track) {
 	gfc_sound_free(currentTrack);
 	switch (track) {
 	case BGM_Battle:
-		currentTrack = gfc_sound_load("audio/bgm/Fiend Fight.mp3", 1, 0);
+		currentTrack = gfc_sound_load("audio/bgm/Fiend Fight.mp3", 0.8, 0);
 		trackLoopPoint = 72;
 		break;
 	case BGM_Boss:
-		currentTrack = gfc_sound_load("audio/bgm/Monstrous Mayhem.mp3", 1, 0);
+		currentTrack = gfc_sound_load("audio/bgm/Monstrous Mayhem.mp3", 0.8, 0);
 		trackLoopPoint = 48;
 		break;
 	}

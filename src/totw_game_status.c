@@ -6,6 +6,7 @@
 static GameState state = GS_Title;
 static Bool quitting = false;
 static int resX = 0, resY = 0;
+static float waitSpeed = 1;
 
 Bool game_get_quitting() {
 	return quitting;
@@ -30,6 +31,13 @@ int game_get_resolution_x() {
 }
 int game_get_resolution_y() {
 	return resY;
+}
+
+float game_get_wait_speed() {
+	return waitSpeed;
+}
+void game_set_wait_speed(float newSpeed) {
+	waitSpeed = newSpeed;
 }
 
 void game_save() {
